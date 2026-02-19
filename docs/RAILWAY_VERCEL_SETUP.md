@@ -1,0 +1,287 @@
+# ClawHost — Railway + Vercel Setup Guide
+
+Step-by-step deployment of ClawHost using **Railway** (backend, worker, PostgreSQL, Redis) and **Vercel** (frontend).
+
+---
+
+## Prerequisites
+
+- [ ] ClawHost repo pushed to **GitHub** (or GitLab/Bitbucket)
+- [ ] **Stripe** account (live mode keys when ready)
+- [ ] **Contabo** account (API credentials)
+- [ ] **Railway** account — [railway.app](https://railway.app)
+- [ ] **Vercel** account — [vercel.com](https://vercel.com)
+
+---
+
+## Part 1: Railway — Project Setup
+
+### Step 1.1: Create a new project
+
+1. Go to [railway.app](https://railway.app) and sign in (GitHub recommended).
+2. Click **"New Project"**.
+3. Choose **"Empty Project"** (we'll add services manually).
+
+### Step 1.2: Add PostgreSQL
+
+1. In the project, click **"+ New"** → **"Database"** → **"Add PostgreSQL"**.
+2. Wait for PostgreSQL to provision (~30 seconds).
+3. Click the PostgreSQL service → **"Variables"** tab.
+4. Copy **`DATABASE_URL`** (format: `postgresql://user:pass@host:port/railway`).
+5. **Important:** Our app uses `asyncpg`. Change the URL scheme:
+   - From: `postgresql://...`
+   - To: `postgresql+asyncpg://...`
+   - Also add `?ssl=require` if Railway requires SSL: `postgresql+asyncpg://...?ssl=require`
+
+### Step 1.3: Add Redis
+
+1. Click **"+ New"** → **"Database"** → **"Add Redis"**.
+2. Wait for Redis to provision.
+3. Click the Redis service → **"Variables"** tab.
+4. Copy **`REDIS_URL`** (or `REDIS_PRIVATE_URL` if you have both — use the private one for in-Railway traffic).
+
+---
+
+## Part 2: Railway — Backend Service
+
+### Step 2.1: Deploy from GitHub
+
+1. Click **"+ New"** → **"GitHub Repo"**.
+2. Select your ClawHost repository.
+3. Railway will create a new service and attempt a build.
+
+### Step 2.2: Configure the Backend service
+
+1. Click the new service (e.g. "clawhost" or your repo name).
+2. Go to **"Settings"**:
+   - **Root Directory:** Set to `backend`.
+   - **Watch Paths:** `backend/**` (optional; ensures rebuilds only when backend changes).
+3. **Start Command:** The repo includes `backend/railway.json` with `uvicorn app.main:app --host 0.0.0.0 --port $PORT`. Railway will use it automatically. If you override in Settings, use the same command.
+
+### Step 2.3: Add a database (reference)
+
+1. In the Backend service → **"Variables"** tab.
+2. Click **"+ Add Variable"** → **"Add Reference"**.
+3. Select the PostgreSQL service → **`DATABASE_URL`**.
+4. If Railway’s variable is `postgresql://`, create a **custom variable**:
+   - Name: `DATABASE_URL`
+   - Value: paste the PostgreSQL URL and change `postgresql://` to `postgresql+asyncpg://`, add `?ssl=require` if needed.
+5. Do the same for **`REDIS_URL`** from the Redis service.
+
+### Step 2.4: Set all Backend environment variables
+
+In **Variables** for the Backend service, add:
+
+| Variable | Value | Notes |
+|----------|-------|-------|
+| `APP_ENV` | `production` | |
+| `SECRET_KEY` | (generate) | Run: `python -c "import secrets; print(secrets.token_urlsafe(32))"` |
+| `DATABASE_URL` | (from PostgreSQL) | Use `postgresql+asyncpg://...` |
+| `REDIS_URL` | (from Redis) | From Redis service variable |
+| `CORS_ALLOWED_ORIGINS` | `https://your-app.vercel.app` | Set after Vercel deploy; update with custom domain later |
+| `STRIPE_SECRET_KEY` | `sk_live_...` | Stripe Dashboard → API keys |
+| `STRIPE_WEBHOOK_SECRET` | `whsec_...` | Set after creating webhook (Step 4) |
+| `STRIPE_STARTER_PRICE_ID` | `price_...` | From Stripe Products |
+| `STRIPE_PRO_PRICE_ID` | `price_...` | From Stripe Products |
+| `CONTABO_API_URL` | `https://api.contabo.com` | |
+| `CONTABO_CLIENT_ID` | (your value) | Contabo Control Panel → API |
+| `CONTABO_CLIENT_SECRET` | (your value) | |
+| `CONTABO_API_USER` | (your API user email) | |
+| `CONTABO_API_PASSWORD` | (your value) | |
+| `CLAWHOST_BASE_DOMAIN` | `customers.yourdomain.com` | Your domain for instance subdomains |
+| `CLOUDFLARE_API_TOKEN` | (optional) | For auto DNS |
+| `CLOUDFLARE_ZONE_ID` | (optional) | |
+| `RESEND_API_KEY` | (optional) | For provisioning emails |
+| `EMAIL_FROM` | `noreply@yourdomain.com` | |
+
+### Step 2.5: Run database migrations
+
+1. In Railway, you can run a **one-off command** via the CLI or a temporary job.
+2. **Option A — Railway CLI:**
+   ```bash
+   npm i -g @railway/cli
+   railway login
+   railway link   # select your project
+   cd backend
+   railway run alembic upgrade head
+   ```
+3. **Option B — Local with production DB:**
+   - Copy `DATABASE_URL` from Railway (with `postgresql+asyncpg`).
+   - In your `backend` folder: `DATABASE_URL="..." alembic upgrade head`
+
+### Step 2.6: Generate domain for Backend
+
+1. Backend service → **"Settings"** → **"Networking"** (or "Generate Domain").
+2. Click **"Generate Domain"**.
+3. Copy the URL (e.g. `https://clawhost-backend-production-xxxx.up.railway.app`).
+4. This is your **API URL**. You’ll use it for the frontend and Stripe webhook.
+
+---
+
+## Part 3: Railway — Worker Service
+
+### Step 3.1: Add Worker from same repo
+
+1. Click **"+ New"** → **"GitHub Repo"**.
+2. Select the **same** ClawHost repository.
+3. A second service is created.
+
+### Step 3.2: Configure the Worker service
+
+1. Click the new service → **"Settings"**:
+   - **Root Directory:** `backend`
+2. **Start Command:** `arq app.queue.worker.WorkerSettings`
+
+### Step 3.3: Set Worker environment variables
+
+1. Worker service → **"Variables"**.
+2. Add the **same variables** as the Backend (or use **Shared Variables** if Railway supports it).
+3. Minimum required: `DATABASE_URL`, `REDIS_URL`, and all Contabo, Stripe, Cloudflare vars used by the provision job.
+4. You can **reference** the Backend’s variables or duplicate them. Ensure `REDIS_URL` matches the Backend.
+
+### Step 3.4: Deploy
+
+1. Trigger a deploy (push to GitHub or manual "Redeploy").
+2. Check **Logs** — you should see `arq` / worker startup messages.
+
+---
+
+## Part 4: Stripe Webhook
+
+### Step 4.1: Create webhook in Stripe
+
+1. Go to [Stripe Dashboard](https://dashboard.stripe.com) → **Developers** → **Webhooks**.
+2. Click **"Add endpoint"**.
+3. **Endpoint URL:** `https://YOUR-RAILWAY-BACKEND-DOMAIN/webhooks/stripe`
+   - Example: `https://clawhost-backend-production-xxxx.up.railway.app/webhooks/stripe`
+4. **Events to send:**
+   - `checkout.session.completed`
+   - `invoice.payment_failed`
+   - `customer.subscription.deleted`
+5. Click **"Add endpoint"**.
+6. Open the new webhook → **"Reveal"** signing secret.
+7. Copy the value (starts with `whsec_`).
+
+### Step 4.2: Add webhook secret to Railway
+
+1. Backend service → **Variables**.
+2. Set `STRIPE_WEBHOOK_SECRET` = `whsec_...` (the value you copied).
+3. Redeploy if needed.
+
+---
+
+## Part 5: Vercel — Frontend
+
+### Step 5.1: Import project
+
+1. Go to [vercel.com](https://vercel.com) and sign in (GitHub recommended).
+2. Click **"Add New..."** → **"Project"**.
+3. Import your ClawHost repository.
+4. **Framework Preset:** Next.js (auto-detected).
+
+### Step 5.2: Configure build
+
+1. **Root Directory:** `frontend` (or leave blank if repo root is frontend).
+2. **Build Command:** `npm run build` (default).
+3. **Output Directory:** `.next` (default for Next.js).
+4. **Install Command:** `npm install` (default).
+
+### Step 5.3: Environment variables
+
+1. In project **Settings** → **Environment Variables**, add:
+
+| Name | Value | Environment |
+|------|-------|-------------|
+| `NEXT_PUBLIC_API_URL` | `https://YOUR-RAILWAY-BACKEND-DOMAIN` | Production, Preview |
+
+2. Use your Railway Backend domain (e.g. `https://clawhost-backend-production-xxxx.up.railway.app`).
+3. No trailing slash.
+
+### Step 5.4: Deploy
+
+1. Click **"Deploy"**.
+2. After deployment, copy the project URL (e.g. `https://clawhost-xxx.vercel.app`).
+
+### Step 5.5: Update CORS in Railway
+
+1. Backend service → **Variables**.
+2. Set `CORS_ALLOWED_ORIGINS` = `https://clawhost-xxx.vercel.app`
+   - Add multiple origins comma-separated if needed: `https://app.clawhost.com,https://clawhost.com`
+3. Redeploy Backend.
+
+---
+
+## Part 6: Verify Deployment
+
+### 6.1: Health check
+
+```bash
+curl https://YOUR-RAILWAY-BACKEND-DOMAIN/health
+# Expected: {"status":"ok"}
+```
+
+### 6.2: Frontend
+
+1. Open your Vercel URL.
+2. Register a new account.
+3. Log in and open the dashboard.
+4. Try **Subscribe** and complete a test checkout (use Stripe test mode first if preferred).
+
+### 6.3: Worker
+
+1. Railway → Worker service → **Logs**.
+2. After a subscription, you should see the provisioning job running.
+3. Check for errors (Contabo, Redis, DB).
+
+---
+
+## Part 7: Custom Domains (Optional)
+
+### Railway (API)
+
+1. Backend service → **Settings** → **Networking** → **Custom Domain**.
+2. Add `api.yourdomain.com` (or similar).
+3. Add the CNAME record in your DNS provider.
+4. Update `NEXT_PUBLIC_API_URL` and `CORS_ALLOWED_ORIGINS` accordingly.
+5. Update Stripe webhook URL.
+
+### Vercel (Frontend)
+
+1. Project → **Settings** → **Domains**.
+2. Add `app.yourdomain.com`.
+3. Follow Vercel’s DNS instructions.
+4. Update `CORS_ALLOWED_ORIGINS` in Railway.
+
+---
+
+## Troubleshooting
+
+| Issue | Check |
+|-------|-------|
+| CORS errors | `CORS_ALLOWED_ORIGINS` matches frontend URL exactly (no trailing slash) |
+| 502 / timeout | Backend start command correct; check Railway logs |
+| Worker not processing jobs | Same `REDIS_URL` as Backend; worker logs for errors |
+| DB connection failed | `postgresql+asyncpg://` in `DATABASE_URL`; `?ssl=require` if needed |
+| Stripe webhook 401 | Correct `STRIPE_WEBHOOK_SECRET`; webhook URL uses HTTPS |
+| Provisioning fails | Contabo credentials; Redis reachable from Worker |
+
+---
+
+## Cost Estimate
+
+| Service | Approx. cost |
+|---------|--------------|
+| Railway (Backend + Worker + PostgreSQL + Redis) | ~$5–20/mo (usage-based) |
+| Vercel (Frontend) | Free tier often sufficient |
+| **Total** | ~$5–25/mo |
+
+---
+
+## Quick Reference
+
+| Item | Where |
+|------|-------|
+| API URL | Railway Backend → Generate Domain |
+| Frontend URL | Vercel project URL |
+| Stripe webhook | `{API_URL}/webhooks/stripe` |
+| CORS | `CORS_ALLOWED_ORIGINS` = frontend URL |

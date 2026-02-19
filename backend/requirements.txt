@@ -1,0 +1,35 @@
+# ClawHost Backend — FastAPI + SQLAlchemy + Stripe + Queue
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+pydantic[email]==2.10.3
+pydantic-settings==2.6.1
+
+# Database
+sqlalchemy[asyncio]==2.0.36
+asyncpg==0.30.0
+alembic==1.14.0
+
+# Auth
+python-jose[cryptography]==3.3.0
+bcrypt>=4.0.1,<5
+
+# Stripe
+stripe==11.3.0
+
+# Queue (Redis + ARQ for async jobs, BullMQ-style)
+redis==5.2.1
+arq==0.26.1
+
+# HTTP client for provider/DNS
+httpx==0.28.1
+
+# Crypto for SSH key generation + encryption at rest (Fernet is in cryptography)
+# 42.x has pre-built wheels on Windows; 44+ may require Rust to build
+cryptography>=41.0.0,<43
+
+# Optional: email (Resend or SendGrid)
+resend==2.5.1
+
+# Dev
+pytest==8.3.4
+pytest-asyncio==0.24.0
