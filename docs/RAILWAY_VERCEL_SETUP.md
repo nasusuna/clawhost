@@ -2,6 +2,8 @@
 
 Step-by-step deployment of ClawHost using **Railway** (backend, worker, PostgreSQL, Redis) and **Vercel** (frontend).
 
+**Order of operations:** Create Railway project → Backend + DB + Redis → get Backend URL → run migrations → add Worker → Stripe webhook → Vercel frontend → set `CORS_ALLOWED_ORIGINS` and `NEXT_PUBLIC_API_URL` → verify.
+
 ---
 
 ## Prerequisites
@@ -93,6 +95,14 @@ In **Variables** for the Backend service, add:
 | `CLOUDFLARE_ZONE_ID` | (optional) | |
 | `RESEND_API_KEY` | (optional) | For provisioning emails |
 | `EMAIL_FROM` | `noreply@yourdomain.com` | |
+| `LOG_LEVEL` | `INFO` (optional) | Logging level; default INFO |
+| `ADMIN_SECRET` | (optional) | Secret for admin API (X-Admin-Secret); needed for key pool endpoints |
+| `GCP_PROJECT_ID` | (optional) | For automated Gemini key pool replenishment |
+| `GOOGLE_APPLICATION_CREDENTIALS` | (optional) | Path or JSON for GCP; set in Worker too if using replenish |
+| `GEMINI_KEY_POOL_MIN_AVAILABLE` | `2` (optional) | Min keys to keep in pool |
+| `GEMINI_KEY_POOL_REPLENISH_ENABLED` | `false` (optional) | Set `true` to enable cron replenish (Worker must have GCP env) |
+
+**Production requirement:** With `APP_ENV=production`, the app will **not start** unless `SECRET_KEY` is at least 32 characters and `CORS_ALLOWED_ORIGINS` is set. Set a placeholder for CORS (e.g. `https://placeholder.vercel.app`) before first deploy, then update after you have the real Vercel URL.
 
 ### Step 2.5: Run database migrations
 
@@ -136,8 +146,9 @@ In **Variables** for the Backend service, add:
 
 1. Worker service → **"Variables"**.
 2. Add the **same variables** as the Backend (or use **Shared Variables** if Railway supports it).
-3. Minimum required: `DATABASE_URL`, `REDIS_URL`, and all Contabo, Stripe, Cloudflare vars used by the provision job.
-4. You can **reference** the Backend’s variables or duplicate them. Ensure `REDIS_URL` matches the Backend.
+3. Minimum required: `DATABASE_URL`, `REDIS_URL`, `APP_ENV`, and all Contabo, Stripe, Cloudflare vars used by the provision job.
+4. If you use **Gemini key pool replenishment** (cron), set `GEMINI_KEY_POOL_REPLENISH_ENABLED=true`, `GCP_PROJECT_ID`, and `GOOGLE_APPLICATION_CREDENTIALS` (or equivalent) on the Worker as well.
+5. You can **reference** the Backend’s variables or duplicate them. Ensure `REDIS_URL` matches the Backend.
 
 ### Step 3.4: Deploy
 
@@ -216,8 +227,13 @@ In **Variables** for the Backend service, add:
 ### 6.1: Health check
 
 ```bash
+# Liveness (process up)
 curl https://YOUR-RAILWAY-BACKEND-DOMAIN/health
 # Expected: {"status":"ok"}
+
+# Readiness (DB + Redis reachable; use for load balancer health checks if supported)
+curl https://YOUR-RAILWAY-BACKEND-DOMAIN/health/ready
+# Expected: {"status":"ready","checks":{"database":"ok","redis":"ok"}}
 ```
 
 ### 6.2: Frontend
@@ -262,8 +278,10 @@ curl https://YOUR-RAILWAY-BACKEND-DOMAIN/health
 | 502 / timeout | Backend start command correct; check Railway logs |
 | Worker not processing jobs | Same `REDIS_URL` as Backend; worker logs for errors |
 | DB connection failed | `postgresql+asyncpg://` in `DATABASE_URL`; `?ssl=require` if needed |
+| App won't start (production) | `SECRET_KEY` ≥ 32 chars; `CORS_ALLOWED_ORIGINS` non-empty |
 | Stripe webhook 401 | Correct `STRIPE_WEBHOOK_SECRET`; webhook URL uses HTTPS |
 | Provisioning fails | Contabo credentials; Redis reachable from Worker |
+| 503 on /health/ready | DB or Redis down; check Railway service status and vars |
 
 ---
 
@@ -284,4 +302,6 @@ curl https://YOUR-RAILWAY-BACKEND-DOMAIN/health
 | API URL | Railway Backend → Generate Domain |
 | Frontend URL | Vercel project URL |
 | Stripe webhook | `{API_URL}/webhooks/stripe` |
-| CORS | `CORS_ALLOWED_ORIGINS` = frontend URL |
+| CORS | `CORS_ALLOWED_ORIGINS` = frontend URL (required in production) |
+| Health (liveness) | `GET /health` |
+| Health (readiness) | `GET /health/ready` (DB + Redis) |

@@ -2,11 +2,11 @@
 import uuid
 
 import stripe
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.db.models import Instance, InstanceStatus, Subscription, SubscriptionStatus, User
+from app.db.models import GeminiKeyPool, Instance, InstanceStatus, Subscription, SubscriptionStatus, User
 from app.email.send import send_payment_failed, send_subscription_canceled
 from app.provider.contabo import ContaboClient
 from app.queue.worker import enqueue_provision_job
@@ -138,6 +138,8 @@ async def handle_subscription_deleted(session: AsyncSession, event: dict) -> Non
     for inst in instances:
         inst.status = InstanceStatus.deleted
         session.add(inst)
+        # Release pool key so it can be assigned to another instance
+        await session.execute(update(GeminiKeyPool).where(GeminiKeyPool.instance_id == inst.id).values(instance_id=None))
         if provider and inst.provider_vps_id:
             try:
                 await provider.delete(inst.provider_vps_id)

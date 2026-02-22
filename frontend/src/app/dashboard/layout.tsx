@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/ui/Button";
+import { ClawHostLogo } from "@/components/Logo";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, token, logout } = useAuth();
@@ -27,7 +28,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen flex flex-col">
       <header className="border-b border-[var(--muted)] px-6 py-4 flex items-center justify-between">
         <nav className="flex items-center gap-6">
-          <Link href="/dashboard" className="font-semibold">ClawHost</Link>
+          <Link href="/">
+            <ClawHostLogo size="sm" />
+          </Link>
           <Link href="/dashboard" className={pathname === "/dashboard" ? "text-emerald-500" : "text-neutral-400 hover:text-[var(--foreground)]"}>Dashboard</Link>
           <Link href="/dashboard/instances" className={pathname === "/dashboard/instances" ? "text-emerald-500" : "text-neutral-400 hover:text-[var(--foreground)]"}>Instances</Link>
           <Link href="/dashboard/subscribe" className={pathname === "/dashboard/subscribe" ? "text-emerald-500" : "text-neutral-400 hover:text-[var(--foreground)]"}>Subscribe</Link>

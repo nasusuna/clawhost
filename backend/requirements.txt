@@ -30,6 +30,9 @@ cryptography>=41.0.0,<43
 # Optional: email (Resend or SendGrid)
 resend==2.5.1
 
+# Optional: create Gemini API keys via GCP API Keys API (script create_gemini_key_gcp.py)
+google-cloud-api-keys>=0.7.0
+
 # Dev
 pytest==8.3.4
 pytest-asyncio==0.24.0

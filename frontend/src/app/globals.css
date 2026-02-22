@@ -2,14 +2,166 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #0a0a0f;
-  --foreground: #fafafa;
-  --card: #14141a;
-  --muted: #27272f;
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap");
+
+/* Lovable Design System — HSL format */
+
+@layer base {
+  :root {
+    --background: 222 47% 5%;
+    --foreground: 210 40% 96%;
+
+    --card: 220 40% 8%;
+    --card-foreground: 210 40% 96%;
+
+    --popover: 220 40% 8%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 186 100% 50%;
+    --primary-foreground: 222 47% 5%;
+
+    --secondary: 220 35% 12%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 220 35% 10%;
+    --muted-foreground: 215 20% 55%;
+
+    --accent: 220 40% 14%;
+    --accent-foreground: 210 40% 96%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 220 30% 14%;
+    --input: 220 30% 14%;
+    --ring: 186 100% 50%;
+
+    --radius: 0.75rem;
+
+    --cyan: 186 100% 50%;
+    --cyan-glow: 186 100% 60%;
+    --blue-accent: 220 100% 65%;
+    --purple-accent: 265 80% 65%;
+
+    --gradient-hero: radial-gradient(ellipse at 20% 50%, hsl(186 100% 15% / 0.4) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 20%, hsl(220 100% 20% / 0.3) 0%, transparent 60%),
+      radial-gradient(ellipse at 50% 100%, hsl(265 80% 10% / 0.3) 0%, transparent 60%);
+
+    --gradient-card: linear-gradient(135deg, hsl(220 40% 10% / 0.8), hsl(220 35% 8% / 0.9));
+    --gradient-primary: linear-gradient(135deg, hsl(186 100% 50%), hsl(220 100% 65%));
+    --gradient-text: linear-gradient(135deg, hsl(186 100% 60%), hsl(220 100% 70%));
+
+    --glow-cyan: 0 0 20px hsl(186 100% 50% / 0.4), 0 0 60px hsl(186 100% 50% / 0.15);
+    --glow-blue: 0 0 20px hsl(220 100% 65% / 0.4), 0 0 60px hsl(220 100% 65% / 0.15);
+    --shadow-card: 0 4px 24px hsl(0 0% 0% / 0.4), 0 1px 0 hsl(186 100% 50% / 0.05) inset;
+
+    --sidebar-background: 220 40% 7%;
+    --sidebar-foreground: 210 40% 90%;
+    --sidebar-primary: 186 100% 50%;
+    --sidebar-primary-foreground: 222 47% 5%;
+    --sidebar-accent: 220 35% 12%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 220 30% 14%;
+    --sidebar-ring: 186 100% 50%;
+  }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: Inter, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background-color: hsl(var(--background));
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: Inter, sans-serif;
+    font-weight: 700;
+  }
+
+  code, .mono {
+    font-family: "JetBrains Mono", monospace;
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    background: var(--gradient-text);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .glow-cyan {
+    box-shadow: var(--glow-cyan);
+  }
+
+  .glow-blue {
+    box-shadow: var(--glow-blue);
+  }
+
+  .card-glass {
+    background: var(--gradient-card);
+    border: 1px solid hsl(220 30% 18%);
+    box-shadow: var(--shadow-card);
+    backdrop-filter: blur(12px);
+  }
+
+  .hero-gradient {
+    background: var(--gradient-hero);
+  }
+
+  .border-cyan {
+    border-color: hsl(var(--cyan));
+  }
+
+  .dot-online {
+    animation: pulse-dot 2s infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; box-shadow: 0 0 6px hsl(142 70% 50%); }
+    50% { opacity: 0.6; box-shadow: 0 0 12px hsl(142 70% 50%); }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0px); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .animate-float {
+    animation: float 4s ease-in-out infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% center; }
+    100% { background-position: 200% center; }
+  }
+
+  .animate-shimmer {
+    background: linear-gradient(90deg, transparent, hsl(186 100% 50% / 0.15), transparent);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+  }
+
+  .badge-pill {
+    background: hsl(186 100% 50% / 0.1);
+    border: 1px solid hsl(186 100% 50% / 0.3);
+    color: hsl(var(--cyan));
+    font-family: "JetBrains Mono", monospace;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+  }
+
+  .stat-card {
+    background: hsl(220 40% 8% / 0.6);
+    border: 1px solid hsl(220 30% 16%);
+    border-radius: 0.5rem;
+    padding: 0.75rem 1.25rem;
+  }
 }

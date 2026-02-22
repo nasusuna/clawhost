@@ -5,6 +5,7 @@
 
 # Python
 .venv/
+.venv312/
 venv/
 __pycache__/
 *.py[cod]
@@ -30,3 +31,6 @@ Thumbs.db
 *.log
 dist/
 build/
+
+# Temp
+smooth-page-builder-temp/

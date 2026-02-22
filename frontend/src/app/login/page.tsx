@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/Label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
 import { useAuth } from "@/components/AuthProvider";
 import { api } from "@/lib/api";
+import { ClawHostLogo } from "@/components/Logo";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -38,7 +39,10 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-8">
+    <main className="flex min-h-screen flex-col items-center justify-center gap-8 p-8">
+      <Link href="/" className="transition-opacity hover:opacity-90">
+        <ClawHostLogo size="md" />
+      </Link>
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Log in</CardTitle>

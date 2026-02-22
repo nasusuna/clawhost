@@ -7,7 +7,7 @@ from sqlalchemy import select
 from app.auth.deps import get_current_user
 from app.db.models import Instance, InstanceStatus, Subscription, User
 from app.db.session import get_session
-from app.instances.schemas import InstanceResponse
+from app.instances.schemas import InstanceResponse, InstanceUpdate
 from app.queue.worker import enqueue_provision_job
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +28,7 @@ async def list_instances(
             domain=i.domain,
             ip_address=i.ip_address,
             gateway_token=i.gateway_token,
+            gemini_api_key_set=bool(i.gemini_api_key),
             created_at=i.created_at,
             last_heartbeat=i.last_heartbeat,
         )
@@ -53,6 +54,38 @@ async def get_instance(
         domain=instance.domain,
         ip_address=instance.ip_address,
         gateway_token=instance.gateway_token,
+        gemini_api_key_set=bool(instance.gemini_api_key),
+        created_at=instance.created_at,
+        last_heartbeat=instance.last_heartbeat,
+    )
+
+
+@router.patch("/{instance_id}", response_model=InstanceResponse)
+async def update_instance(
+    instance_id: UUID,
+    body: InstanceUpdate,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> InstanceResponse:
+    """Update instance (e.g. set Gemini API key). Key is used on next provision or can be synced later."""
+    result = await session.execute(
+        select(Instance).where(Instance.id == instance_id, Instance.user_id == user.id)
+    )
+    instance = result.scalar_one_or_none()
+    if not instance:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Instance not found")
+    if body.gemini_api_key is not None:
+        instance.gemini_api_key = body.gemini_api_key.strip() or None
+    session.add(instance)
+    await session.commit()
+    await session.refresh(instance)
+    return InstanceResponse(
+        id=str(instance.id),
+        status=instance.status.value,
+        domain=instance.domain,
+        ip_address=instance.ip_address,
+        gateway_token=instance.gateway_token,
+        gemini_api_key_set=bool(instance.gemini_api_key),
         created_at=instance.created_at,
         last_heartbeat=instance.last_heartbeat,
     )

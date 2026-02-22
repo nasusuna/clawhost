@@ -81,6 +81,7 @@ class Instance(Base):
     )
     domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
     gateway_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    gemini_api_key: Mapped[str | None] = mapped_column(String(256), nullable=True)
     provision_job_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     last_heartbeat: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -90,3 +91,21 @@ class Instance(Base):
 
     user: Mapped["User"] = relationship("User", back_populates="instances")
     subscription: Mapped["Subscription | None"] = relationship("Subscription", back_populates="instances")
+    gemini_key_pool_entry: Mapped["GeminiKeyPool | None"] = relationship(
+        "GeminiKeyPool", back_populates="instance", uselist=False, foreign_keys="GeminiKeyPool.instance_id"
+    )
+
+
+class GeminiKeyPool(Base):
+    """Pre-created Gemini API keys; one is assigned to each new instance when no user/shared key is set."""
+
+    __tablename__ = "gemini_key_pool"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    api_key: Mapped[str] = mapped_column(String(256), nullable=False)
+    instance_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("instances.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    instance: Mapped["Instance | None"] = relationship("Instance", back_populates="gemini_key_pool_entry", foreign_keys=[instance_id])

@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { assertProductionApiUrl } from "@/lib/utils";
 
 type User = { id: string; email: string } | null;
 
@@ -38,6 +39,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const t = typeof window !== "undefined" ? localStorage.getItem("clawhost_token") : null;
     if (t) setToken(t);
+  }, []);
+
+  useEffect(() => {
+    assertProductionApiUrl();
   }, []);
 
   useEffect(() => {
