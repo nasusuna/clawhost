@@ -15,6 +15,10 @@ COPY alembic ./alembic
 COPY alembic.ini .
 COPY app ./app
 
+# Bust cache so CMD is from current Dockerfile (remove after deploy works)
+ARG CACHEBUST=
+RUN echo "Build ${CACHEBUST:-no-arg}"
+
 # Run API. Listen on $PORT so Railway marks the container as started.
 # If you set Custom Start Command in Railway, it overrides this — clear it to use the Dockerfile.
 CMD ["sh", "-c", "echo \"[ClawHost] Starting port=${PORT:-8000}\" && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
