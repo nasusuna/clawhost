@@ -15,6 +15,6 @@ COPY alembic ./alembic
 COPY alembic.ini .
 COPY app ./app
 
-# Run API. Listen on $PORT immediately so Railway marks the container as started.
-# Run migrations once via Railway CLI or one-off: railway run alembic upgrade head
-CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Run API. Listen on $PORT so Railway marks the container as started.
+# If you set Custom Start Command in Railway, it overrides this — clear it to use the Dockerfile.
+CMD ["sh", "-c", "echo \"[ClawHost] Starting port=${PORT:-8000}\" && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
