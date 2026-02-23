@@ -58,12 +58,12 @@ Step-by-step deployment of ClawHost using **Railway** (backend, worker, PostgreS
 2. Go to **"Settings"**:
    - **Root Directory:** Set to `backend`.
    - **Watch Paths:** `backend/**` (optional; ensures rebuilds only when backend changes).
-3. **Start Command:** The repo no longer sets a start command in `railway.json`, so you **must** set it in Railway for each service:
-   - **Backend:** In the Backend service → Settings → Custom Start Command, set:
+3. **Start Command:** `backend/railway.json` does **not** set a start command, so you **must** set it in Railway for each service (the UI is editable when no startCommand is in the file):
+   - **Backend (e.g. clawhost):** Settings → Custom Start Command:
      ```bash
-     alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+     sh -c 'uvicorn app.main:app --host 0.0.0.0 --port $PORT'
      ```
-   - **Worker:** In the Worker service → Settings → Custom Start Command, set:
+   - **Worker (e.g. intelligent-smile or second service):** Settings → Custom Start Command:
      ```bash
      arq app.queue.worker.WorkerSettings
      ```
@@ -92,8 +92,8 @@ In **Variables** for the Backend service, add:
 | `CORS_ALLOWED_ORIGINS` | `https://your-app.vercel.app` | Set after Vercel deploy; update with custom domain later |
 | `STRIPE_SECRET_KEY` | `sk_live_...` | Stripe Dashboard → API keys |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_...` | Set after creating webhook (Step 4) |
-| `STRIPE_STARTER_PRICE_ID` | `price_...` | From Stripe Products |
-| `STRIPE_PRO_PRICE_ID` | `price_...` | From Stripe Products |
+| `STRIPE_STARTER_PRICE_ID` | `price_...` | **Must be a price ID**, not a product ID. Stripe Dashboard → Products → your product → Pricing section → copy the **price** ID (starts with `price_`). |
+| `STRIPE_PRO_PRICE_ID` | `price_...` | Same as above; use the price ID for the Pro plan. |
 | `CONTABO_API_URL` | `https://api.contabo.com` | |
 | `CONTABO_CLIENT_ID` | (your value) | Contabo Control Panel → API |
 | `CONTABO_CLIENT_SECRET` | (your value) | |
@@ -247,9 +247,11 @@ Create a webhook in Stripe so your backend is notified when a customer completes
 ### Step 5.5: Update CORS in Railway
 
 1. Backend service → **Variables**.
-2. Set `CORS_ALLOWED_ORIGINS` = `https://clawhost-xxx.vercel.app`
-   - Add multiple origins comma-separated if needed: `https://app.clawhost.com,https://clawhost.com`
-3. Redeploy Backend.
+2. Set `CORS_ALLOWED_ORIGINS` to the **exact** origin of your frontend (the full URL from the browser address bar, without path or trailing slash).
+   - **Vercel production:** e.g. `https://clawhost.vercel.app`
+   - **Vercel preview/deploy URL:** e.g. `https://clawhost-n3491z3wj-rcat36410-3461s-projects.vercel.app` — copy from the address bar when you open the app.
+   - Multiple origins: comma-separated, no spaces: `https://app.clawhost.com,https://clawhost.vercel.app`
+3. Redeploy Backend after changing variables.
 
 ---
 
@@ -305,13 +307,17 @@ curl https://YOUR-RAILWAY-BACKEND-DOMAIN/health/ready
 
 | Issue | Check |
 |-------|-------|
+| **Failed to fetch** (Subscribe / API calls) | 1) **Vercel:** `NEXT_PUBLIC_API_URL` = your Railway Backend URL (e.g. `https://clawhost-production-xxxx.up.railway.app`). 2) **Railway:** `CORS_ALLOWED_ORIGINS` must include the **exact** frontend origin from the browser (e.g. `https://clawhost-n3491z3wj-rcat36410-3461s-projects.vercel.app`). No trailing slash. For multiple deployments, add comma-separated origins. |
 | CORS errors | `CORS_ALLOWED_ORIGINS` matches frontend URL exactly (no trailing slash) |
 | 502 / timeout | Backend start command correct; check Railway logs |
 | Worker not processing jobs | Same `REDIS_URL` as Backend; worker logs for errors |
 | DB connection failed | `postgresql+asyncpg://` in `DATABASE_URL`; `?ssl=require` if needed |
 | App won't start (production) | `SECRET_KEY` ≥ 32 chars; `CORS_ALLOWED_ORIGINS` non-empty |
 | Stripe webhook 401 | Correct `STRIPE_WEBHOOK_SECRET`; webhook URL uses HTTPS |
+| **No such price / prod_ in Stripe** | `STRIPE_STARTER_PRICE_ID` and `STRIPE_PRO_PRICE_ID` must be **price** IDs (`price_...`), not product IDs (`prod_...`). In Stripe Dashboard → Product → Pricing, copy the price ID. |
+| **Product is not active** | Stripe error "product is not active" or "not available to be purchased": the product linked to that price is archived or draft. Stripe Dashboard → Product catalogue → open the product → set status to **Active** (or unarchive). |
 | Provisioning fails | Contabo credentials; Redis reachable from Worker |
+| **Instance stuck in "provisioning"** | 1) **Railway → Worker → Logs**: the provision job logs when it starts, when it can't find the instance, when Contabo isn't configured, when create_vps fails, and when the VPS never reaches "running". Look for `provision_instance started`, `no instance in provisioning`, `Contabo not configured`, `create_vps failed`, or `timed out waiting for VPS`. 2) **Contabo dashboard** ([new.contabo.com/servers/vps](https://new.contabo.com/servers/vps)): check if a new VPS was created and its state. 3) Ensure **Worker** has the same **Contabo** and **Redis** env vars as Backend (REDIS_URL, CONTABO_*). 4) Provisioning can take 10–20+ min (poll every 60s, up to ~30 min). Use "Retry provisioning" after fixing config. |
 | 503 on /health/ready | DB or Redis down; check Railway service status and vars |
 
 ---

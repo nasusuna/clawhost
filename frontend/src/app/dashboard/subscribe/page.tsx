@@ -37,7 +37,12 @@ export default function SubscribePage() {
       }
       setError("No checkout URL returned");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Checkout failed");
+      const message = err instanceof Error ? err.message : "Checkout failed";
+      const hint =
+        message === "Failed to fetch"
+          ? " Check that NEXT_PUBLIC_API_URL (Vercel) points to your Railway backend and CORS_ALLOWED_ORIGINS (Railway) includes this site’s origin."
+          : "";
+      setError(message + hint);
     } finally {
       setLoading(null);
     }

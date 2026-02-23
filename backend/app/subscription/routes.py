@@ -1,4 +1,5 @@
 """Subscription routes: list plans, create Stripe Checkout session."""
+import stripe
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -56,11 +57,32 @@ async def checkout(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid plan_type")
     if not settings.stripe_secret_key:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Stripe not configured")
-    url = await create_checkout_session(
-        session=session,
-        user=user,
-        plan_type=body.plan_type,
-        success_url=body.success_url,
-        cancel_url=body.cancel_url,
-    )
+    try:
+        url = await create_checkout_session(
+            session=session,
+            user=user,
+            plan_type=body.plan_type,
+            success_url=body.success_url,
+            cancel_url=body.cancel_url,
+        )
+    except stripe.error.InvalidRequestError as e:
+        msg = str(e).strip()
+        if "No such price" in msg or "resource_missing" in getattr(e, "code", ""):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=(
+                    "Stripe price ID is invalid or missing. In Stripe Dashboard use a price ID (price_...), "
+                    "not a product ID (prod_...). Product → Pricing → copy the price ID. "
+                    "Set STRIPE_STARTER_PRICE_ID and STRIPE_PRO_PRICE_ID in Railway."
+                ),
+            ) from e
+        if "product is not active" in msg.lower() or "not available to be purchased" in msg.lower():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=(
+                    "This plan is not available for purchase: the product is not active in Stripe. "
+                    "In Stripe Dashboard → Product catalogue → open the product → set status to Active (or unarchive it)."
+                ),
+            ) from e
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Stripe request failed") from e
     return {"checkout_url": url}

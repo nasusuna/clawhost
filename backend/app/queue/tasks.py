@@ -2,6 +2,7 @@
 import asyncio
 import base64
 import json
+import logging
 import os
 import secrets
 import uuid
@@ -18,6 +19,8 @@ from app.dns.cloudflare import create_a_record
 from app.email.send import send_provisioning_done
 from app.gemini_pool.gcp import create_and_store_one_gemini_key, get_available_pool_count
 from app.provider.contabo import ContaboClient
+
+logger = logging.getLogger("app.queue.tasks")
 
 
 async def _get_provider_client() -> ContaboClient | None:
@@ -150,6 +153,7 @@ async def provision_instance(
     user_id = uuid.UUID(user_id_str)
     subscription_id = uuid.UUID(subscription_id_str)
     job_id = ctx.get("job_id", "unknown")
+    logger.info("provision_instance started job_id=%s subscription_id=%s plan_type=%s", job_id, subscription_id, plan_type)
 
     async with async_session_maker() as session:
         result = await session.execute(
@@ -159,20 +163,26 @@ async def provision_instance(
         )
         row = result.one_or_none()
         if not row:
+            logger.warning("provision_instance: no user/subscription for user_id=%s subscription_id=%s", user_id, subscription_id)
             return
         user, subscription = row
 
-        # Instance created by webhook; find it and set domain + job_id
+        # Instance created by webhook; find it (take first if multiple in provisioning)
         inst_result = await session.execute(
             select(Instance).where(
                 and_(
                     Instance.subscription_id == subscription_id,
                     Instance.status == InstanceStatus.provisioning,
                 )
-            )
+            ).limit(1)
         )
         instance = inst_result.scalar_one_or_none()
         if not instance:
+            logger.warning(
+                "provision_instance: no instance in provisioning for subscription_id=%s (job_id=%s). "
+                "Check that webhook created the instance and Worker runs after Backend.",
+                subscription_id, job_id,
+            )
             return
         domain = f"{user_id.hex[:12]}.{settings.clawhost_base_domain}"
         gateway_token = secrets.token_urlsafe(32)
@@ -202,6 +212,10 @@ async def provision_instance(
 
     provider = await _get_provider_client()
     if not provider:
+        logger.warning(
+            "provision_instance: Contabo not configured (missing CONTABO_* env). "
+            "Set CONTABO_API_URL, CONTABO_CLIENT_ID, CONTABO_CLIENT_SECRET, CONTABO_API_USER, CONTABO_API_PASSWORD on the Worker."
+        )
         async with async_session_maker() as session:
             r = await session.execute(select(Instance).where(Instance.id == instance_id))
             inst = r.scalar_one_or_none()
@@ -212,12 +226,14 @@ async def provision_instance(
 
     cloud_init = _cloud_init_user_data(domain, gateway_token, gemini_api_key)
     try:
+        logger.info("provision_instance: calling Contabo create_vps instance_id=%s", instance_id)
         create_result = await provider.create_vps(
             region="default",
             plan_type=plan_type,
             cloud_init_user_data=cloud_init,
         )
-    except (NotImplementedError, RuntimeError, Exception):
+    except (NotImplementedError, RuntimeError, Exception) as e:
+        logger.exception("provision_instance: Contabo create_vps failed instance_id=%s: %s", instance_id, e)
         async with async_session_maker() as session:
             r = await session.execute(select(Instance).where(Instance.id == instance_id))
             inst = r.scalar_one_or_none()
@@ -238,9 +254,12 @@ async def provision_instance(
     for attempt in range(30):
         await asyncio.sleep(60)
         status = await provider.get_status(create_result.provider_vps_id)
+        if attempt == 0 or attempt % 5 == 0 or status == "running":
+            logger.info("provision_instance: poll attempt=%s provider_vps_id=%s status=%s", attempt + 1, create_result.provider_vps_id, status)
         if status == "running":
             break
         if status in ("deleted", "error"):
+            logger.warning("provision_instance: VPS in bad state provider_vps_id=%s status=%s", create_result.provider_vps_id, status)
             async with async_session_maker() as session:
                 r = await session.execute(select(Instance).where(Instance.id == instance_id))
                 inst = r.scalar_one_or_none()
@@ -248,6 +267,16 @@ async def provision_instance(
                     inst.status = InstanceStatus.stopped
                     await session.commit()
             return
+    else:
+        # Loop ended without break = never got "running" in 30 attempts
+        logger.warning("provision_instance: timed out waiting for VPS to be running provider_vps_id=%s", create_result.provider_vps_id)
+        async with async_session_maker() as session:
+            r = await session.execute(select(Instance).where(Instance.id == instance_id))
+            inst = r.scalar_one_or_none()
+            if inst:
+                inst.status = InstanceStatus.stopped
+                await session.commit()
+        return
 
     # Get IP (create response often has no IP; get_instance returns it when running)
     ip_address = create_result.ip_address or ""
@@ -268,6 +297,7 @@ async def provision_instance(
 
     login_url = f"https://{domain}"
     await send_provisioning_done(user.email, login_url, domain, ip_address)
+    logger.info("provision_instance: done instance_id=%s domain=%s", instance_id, domain)
 
 
 def _gcp_project_id() -> str | None:
