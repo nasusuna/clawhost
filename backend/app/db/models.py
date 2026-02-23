@@ -1,10 +1,10 @@
 """SQLAlchemy models — User, Subscription, Instance."""
 import enum
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Text, func
+from sqlalchemy import BigInteger, Date, DateTime, Enum, ForeignKey, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -53,6 +53,7 @@ class Subscription(Base):
     )
     plan_type: Mapped[str] = mapped_column(String(64), nullable=False)
     current_period_end: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    gcp_project_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)  # per-subscription GCP project
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
@@ -94,6 +95,9 @@ class Instance(Base):
     gemini_key_pool_entry: Mapped["GeminiKeyPool | None"] = relationship(
         "GeminiKeyPool", back_populates="instance", uselist=False, foreign_keys="GeminiKeyPool.instance_id"
     )
+    gemini_usage_entries: Mapped[list["GeminiUsage"]] = relationship(
+        "GeminiUsage", back_populates="instance", cascade="all, delete-orphan"
+    )
 
 
 class GeminiKeyPool(Base):
@@ -109,3 +113,19 @@ class GeminiKeyPool(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     instance: Mapped["Instance | None"] = relationship("Instance", back_populates="gemini_key_pool_entry", foreign_keys=[instance_id])
+
+
+class GeminiUsage(Base):
+    """Monthly Gemini token usage per instance. Used for dashboard display and 60M cap."""
+
+    __tablename__ = "gemini_usage"
+    __table_args__ = (UniqueConstraint("instance_id", "period_start", name="uq_gemini_usage_instance_period"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    instance_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("instances.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    period_start: Mapped[date] = mapped_column(Date(), nullable=False)  # first day of month (UTC)
+    tokens_used: Mapped[int] = mapped_column(BigInteger(), nullable=False, default=0)
+
+    instance: Mapped["Instance"] = relationship("Instance", back_populates="gemini_usage_entries")

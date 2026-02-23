@@ -1,4 +1,6 @@
 """Stripe webhook handler: checkout.session.completed, invoice.payment_failed, customer.subscription.deleted."""
+import asyncio
+import os
 import uuid
 
 import stripe
@@ -8,10 +10,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.db.models import GeminiKeyPool, Instance, InstanceStatus, Subscription, SubscriptionStatus, User
 from app.email.send import send_payment_failed, send_subscription_canceled
+from app.gemini_pool.gcp import create_one_key_for_subscription
 from app.provider.contabo import ContaboClient
 from app.queue.worker import enqueue_provision_job
 
 stripe.api_key = settings.stripe_secret_key
+
+
+def _gcp_project_id() -> str | None:
+    return (
+        (settings.gcp_project_id or "").strip()
+        or os.environ.get("GOOGLE_CLOUD_PROJECT")
+        or os.environ.get("GCP_PROJECT_ID")
+        or None
+    )
+
+
+def _use_per_subscription_gcp_project() -> bool:
+    """True if we should create one GCP project per subscription (org + billing configured)."""
+    if not getattr(settings, "gcp_project_per_subscription_enabled", False):
+        return False
+    org = (getattr(settings, "gcp_organization_id", "") or "").strip()
+    billing = (getattr(settings, "gcp_billing_account_id", "") or "").strip()
+    return bool(org and billing)
 
 
 async def handle_checkout_session_completed(session: AsyncSession, event: dict) -> None:
@@ -49,7 +70,7 @@ async def handle_checkout_session_completed(session: AsyncSession, event: dict) 
     await session.flush()
     await session.refresh(subscription)
 
-    # Instance row (provisioning); commit so worker sees it, then enqueue
+    # Instance row (provisioning); create per-subscription GCP project + key when enabled, else single-project key
     instance = Instance(
         user_id=user_id,
         subscription_id=subscription.id,
@@ -57,6 +78,32 @@ async def handle_checkout_session_completed(session: AsyncSession, event: dict) 
         provision_job_id=None,
     )
     session.add(instance)
+    await session.flush()
+
+    project_id: str | None = None
+    if _use_per_subscription_gcp_project():
+        # Create new GCP project for this subscription: project, enable API, link billing, create $15 budget
+        from app.gcp_project.lifecycle import create_project_and_setup
+
+        project_id = await asyncio.to_thread(
+            create_project_and_setup,
+            settings.gcp_organization_id.strip(),
+            settings.gcp_billing_account_id.strip(),
+            subscription.id,
+            amount_usd=getattr(settings, "gcp_budget_amount_usd", 15.0),
+        )
+        if project_id:
+            subscription.gcp_project_id = project_id
+            session.add(subscription)
+    if not project_id:
+        project_id = _gcp_project_id()
+
+    if project_id:
+        key_string = await create_one_key_for_subscription(project_id, subscription.id)
+        if key_string:
+            instance.gemini_api_key = key_string
+            session.add(instance)
+
     await session.commit()
     await enqueue_provision_job(user_id, subscription.id, plan_type)
 

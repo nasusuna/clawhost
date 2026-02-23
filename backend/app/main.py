@@ -1,9 +1,27 @@
 """ClawHost API — FastAPI app."""
 import logging
+import os
 import sys
+import tempfile
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+
+
+def _ensure_gcp_credentials_file() -> None:
+    """If GOOGLE_APPLICATION_CREDENTIALS is inline JSON (e.g. from Railway), write to temp file so Google clients can load it."""
+    val = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+    if not val or os.path.isfile(val) or not val.startswith("{"):
+        return
+    try:
+        fd, path = tempfile.mkstemp(suffix=".json", prefix="gcp-creds-")
+        try:
+            os.write(fd, val.encode("utf-8"))
+        finally:
+            os.close(fd)
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = path
+    except Exception:
+        pass
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
@@ -14,7 +32,10 @@ from app.config import settings
 from app.db.session import engine
 from app.instances.routes import router as instances_router
 from app.subscription.routes import router as subscription_router
+from app.usage.routes import router as usage_router
 from app.webhooks.routes import router as webhooks_router
+
+_ensure_gcp_credentials_file()
 
 # Logging: level from config, no sensitive data in format
 _log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
@@ -67,6 +88,7 @@ app.include_router(auth_router)
 app.include_router(admin_router)
 app.include_router(subscription_router)
 app.include_router(instances_router)
+app.include_router(usage_router)
 app.include_router(webhooks_router)
 
 

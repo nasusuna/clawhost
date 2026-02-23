@@ -35,8 +35,21 @@ async def _get_provider_client() -> ContaboClient | None:
     return ContaboClient(settings.contabo_api_url)
 
 
-def _openclaw_gemini_config_json() -> str:
-    """Minimal OpenClaw config: Gemini as default model; API key from env GEMINI_API_KEY."""
+def _openclaw_gemini_config_json(gemini_api_key: str | None = None) -> str:
+    """Minimal OpenClaw config: Gemini as default model. If gemini_api_key is set, include it in models.providers.google so OpenClaw finds it (agent auth)."""
+    google_provider: dict[str, Any] = {
+        "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
+        "models": [
+            {
+                "id": "gemini-2.5-flash-lite",
+                "name": "Gemini 2.5 Flash Lite",
+                "contextWindow": 1048576,
+                "maxTokens": 65536,
+            }
+        ],
+    }
+    if gemini_api_key and gemini_api_key.strip():
+        google_provider["apiKey"] = gemini_api_key.strip()
     config = {
         "gateway": {
             "port": 18789,
@@ -57,17 +70,7 @@ def _openclaw_gemini_config_json() -> str:
         },
         "models": {
             "providers": {
-                "google": {
-                    "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
-                    "models": [
-                        {
-                            "id": "gemini-2.5-flash-lite",
-                            "name": "Gemini 2.5 Flash Lite",
-                            "contextWindow": 1048576,
-                            "maxTokens": 65536,
-                        }
-                    ],
-                }
+                "google": google_provider,
             }
         },
     }
@@ -82,7 +85,7 @@ def _cloud_init_user_data(
     """Cloud-Init YAML: Docker, OpenClaw with Gemini config, Nginx, Certbot. No Ollama."""
     image = settings.openclaw_docker_image
     port = settings.openclaw_app_port
-    openclaw_json = _openclaw_gemini_config_json()
+    openclaw_json = _openclaw_gemini_config_json(gemini_api_key)
 
     # Escape gateway_token for shell (single-quote wrap: ' -> '\'')
     gate_esc = gateway_token.replace("'", "'\"'\"'")

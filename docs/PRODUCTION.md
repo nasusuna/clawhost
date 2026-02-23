@@ -574,9 +574,9 @@ New instances are provisioned with **OpenClaw preconfigured for Google Gemini** 
 
 Resolution order when a new instance is provisioned:
 
-1. **Per-instance (user-supplied):** If the instance has `gemini_api_key` set (via dashboard or `PATCH /instances/{id}`), that key is used and injected into the OpenClaw container.
-2. **Shared key:** If not, the backend uses the optional **`GEMINI_API_KEY`** from its own `.env`.
-3. **Key pool:** If still no key, the backend assigns one **unassigned** key from the **Gemini key pool** (table `gemini_key_pool`). You pre-create N keys (e.g. via Google AI Studio or Google Cloud API Keys API), add them through the admin API, and each new user gets one key from the pool automatically. When an instance is deleted (subscription canceled), its pool key is released and can be assigned again.
+1. **Per-instance (set at checkout or later):** If the instance has `gemini_api_key` set, that key is used. **When GCP is configured, the Stripe webhook creates one new Gemini API key per successful subscription** and attaches it to the new instance, so each paying user gets a dedicated key without using the pool.
+2. **Shared key:** If the instance has no key, the backend uses the optional **`GEMINI_API_KEY`** from its own `.env`.
+3. **Key pool:** If still no key, the backend assigns one **unassigned** key from the **Gemini key pool** (table `gemini_key_pool`). When the subscription is deleted, a pool key is released; per-subscription keys (created at checkout) are not returned to the pool.
 
 Cloud-init writes a minimal `openclaw.json` (Gemini as default model, no key in the file) and, when a key is provided, passes it into the container as **`GEMINI_API_KEY`** (key is base64-encoded in user-data and decoded on the server for security).
 
@@ -591,6 +591,44 @@ Cloud-init writes a minimal `openclaw.json` (Gemini as default model, no key in 
 4. **Check pool stats:** **GET /admin/gemini-key-pool** (same header). Returns `{"available": N, "in_use": M}`.
 5. When a **new user** subscribes and the instance is provisioned, if the instance has no user-set key and there is no `GEMINI_API_KEY` in env, the worker picks one available key from the pool, assigns it to that instance, and injects it into the VPS. When the subscription is **deleted**, the key is released back to the pool (`instance_id` set to `NULL`).
 
+### One key per subscription (create on Stripe checkout)
+
+If **GCP is configured** on the Backend (`GCP_PROJECT_ID` or `GOOGLE_CLOUD_PROJECT`, and `GOOGLE_APPLICATION_CREDENTIALS` or ADC), then on **successful Stripe subscription** (webhook `checkout.session.completed`):
+
+1. A **new Gemini API key** is created via the Google Cloud API Keys API (restricted to `generativelanguage.googleapis.com`).
+2. The key is stored on the new **instance** (`instance.gemini_api_key`).
+3. The provision job runs as usual and injects this key into the OpenClaw config for that instance.
+
+So each paying subscriber gets a **dedicated key**; when they open OpenClaw, the Gemini API is already configured. No key pool is used for that instance. If key creation fails (e.g. GCP credentials missing or rate limit), the provision job falls back to shared key or pool as above.
+
+### One GCP project per subscription (recommended for $15 budget cap)
+
+To enforce a **hard spending limit per user** (e.g. $15/month) using GCP Billing, you can create **one GCP project per subscription**. On each successful Stripe checkout the backend will:
+
+1. **Create a new GCP project** under your organization (Cloud Resource Manager API).
+2. **Enable** the Generative Language API for that project (Service Usage API).
+3. **Link the project to your billing account** (Cloud Billing API).
+4. **Create a monthly budget** for that project (e.g. $15) with a 100% threshold alert (Billing Budgets API). You can then enable any “cap” or “disable billing” option in GCP Console if your billing product supports it.
+5. **Create a Gemini API key** in that project and attach it to the new instance.
+
+Each subscriber’s usage is billed to their project; you can set budgets and (where available) caps per project. The subscription’s `gcp_project_id` is stored for reference.
+
+**Configuration (Backend / Worker env):**
+
+- `GCP_PROJECT_PER_SUBSCRIPTION_ENABLED=true`
+- `GCP_ORGANIZATION_ID` — your GCP organization ID (numeric, e.g. `123456789012`).
+- `GCP_BILLING_ACCOUNT_ID` — billing account ID (e.g. `01ABC2D-3EF4G5-6789HI`) or full resource name `billingAccounts/01ABC2D-...`.
+- `GCP_BUDGET_AMOUNT_USD` — monthly budget amount per new project (default `15`).
+- Same credentials as for other GCP features: `GOOGLE_APPLICATION_CREDENTIALS` (or ADC). The service account must have: **Project Creator** (on the org), **Service Usage Admin**, **Billing User** (link project to billing account), **Budget Admin** (create budgets), **API Keys Admin** (create keys in the new project).
+
+**Dependencies:** `google-cloud-resource-manager`, `google-cloud-billing`, `google-cloud-billing-budgets`, `google-api-python-client` (see `backend/requirements.txt`). Run migration `006_add_subscription_gcp_project_id` so `subscriptions.gcp_project_id` exists.
+
+**Detailed setup (migration, GCP org/billing, service account, IAM, env vars, deploy):** see **[GCP_ONE_PROJECT_PER_SUBSCRIPTION_SETUP.md](./GCP_ONE_PROJECT_PER_SUBSCRIPTION_SETUP.md)**.
+
+If per-subscription project creation is disabled or fails, the backend falls back to creating the key in the single project given by `GCP_PROJECT_ID` / `GOOGLE_CLOUD_PROJECT` as above.
+
+**Limiting spend per key (e.g. ~$15/month):** With **one project per subscription** and a budget (and optional cap) on that project, GCP can enforce the limit. With a **single shared project**, Google Cloud does **not** support a per–API-key spending cap; use **quotas** (APIs & Services → Generative Language API → Quotas) or **project-level budgets** for alerts. For **monitoring per-key usage** and **options to cap each user** (separate projects vs app-level proxy), see **docs/GEMINI_PER_USER_MONITORING_AND_CAPS.md**.
+
 ### Generating keys for every user
 
 **Google does not let you programmatically “generate” arbitrary Gemini API keys for end users.** Keys are created by:
@@ -600,6 +638,8 @@ Cloud-init writes a minimal `openclaw.json` (Gemini as default model, no key in 
 - **You (programmatic):** Use [Google Cloud API Keys API](https://cloud.google.com/docs/authentication/api-keys#creating_api_keys) to create keys under your GCP project. That requires a GCP project, billing, and a service account with “API Keys Admin”. Keys you create are tied to your project and quota. Google does not publish a hard limit on the **number** of API keys per project; the only documented limits are **rate limits** on the API Keys API (e.g. 120 write calls per minute). So you can create many keys; throttle creation if you provision a large number of instances at once.
 
 **Create one key via GCP and store in DB:** The backend script `backend/scripts/create_gemini_key_gcp.py` creates a single API key restricted to `generativelanguage.googleapis.com` and inserts it into `gemini_key_pool`. Prerequisites: (1) GCP project with **API Keys API** and **Generative Language API** enabled; (2) a service account with role **API Keys Admin** (or permission `apikeys.keys.create`); (3) Application Default Credentials — set `GOOGLE_APPLICATION_CREDENTIALS` to the service account JSON path, or run `gcloud auth application-default login`. Set `GOOGLE_CLOUD_PROJECT` or `GCP_PROJECT_ID` and `DATABASE_URL`, then run from the backend directory: `python scripts/create_gemini_key_gcp.py`. The script uses `google-cloud-api-keys` (see `requirements.txt`).
+
+**Create multiple keys via GCP (bulk):** Run `python scripts/create_gemini_keys_gcp_bulk.py [N]` from the backend directory with the same env as above. `N` is the number of keys to create (default 5, max 50). Each key is created via the GCP API Keys API and stored in `gemini_key_pool`; a 2-second delay between creations helps avoid rate limits.
 
 **Automated key replenishment (no manual runs):** The ARQ worker can replenish the pool automatically so you never run the script by hand.
 

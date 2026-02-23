@@ -33,6 +33,12 @@ resend==2.5.1
 # Optional: create Gemini API keys via GCP API Keys API (script create_gemini_key_gcp.py)
 google-cloud-api-keys>=0.7.0
 
+# Optional: one GCP project per subscription (create project, enable API, link billing, create budget)
+google-cloud-resource-manager>=1.15.0
+google-cloud-billing>=1.18.0
+google-cloud-billing-budgets>=1.19.0
+google-api-python-client>=2.100.0
+
 # Dev
 pytest==8.3.4
 pytest-asyncio==0.24.0

@@ -59,11 +59,18 @@ class Settings(BaseSettings):
 
     # GCP: for automated Gemini key pool replenishment (create keys via API Keys API and store in DB).
     # Set GCP_PROJECT_ID or GOOGLE_CLOUD_PROJECT env; credentials via GOOGLE_APPLICATION_CREDENTIALS.
-    gcp_project_id: str = ""  # env: GCP_PROJECT_ID or GOOGLE_CLOUD_PROJECT
+    gcp_project_id: str = ""  # env: GCP_PROJECT_ID or GOOGLE_CLOUD_PROJECT (fallback when not using per-sub project)
     # Minimum number of unassigned keys to maintain; replenish cron creates keys when below this.
     gemini_key_pool_min_available: int = 2
     # Enable periodic replenish (ARQ cron). Requires gcp_project_id and ADC.
     gemini_key_pool_replenish_enabled: bool = False
+
+    # GCP: one project per subscription (create project, enable API, link billing, create $15 budget, then create key).
+    # Requires GCP_ORGANIZATION_ID and GCP_BILLING_ACCOUNT_ID. Service account needs Project Creator, Service Usage Admin, Billing User, Budget Admin, API Keys Admin.
+    gcp_project_per_subscription_enabled: bool = False
+    gcp_organization_id: str = ""  # e.g. "123456789012"
+    gcp_billing_account_id: str = ""  # e.g. "01ABC2D-3EF4G5-6789HI" (ID only) or "billingAccounts/01ABC2D-3EF4G5-6789HI"
+    gcp_budget_amount_usd: float = 15.0  # monthly budget for each new subscription project
 
     @model_validator(mode="after")
     def validate_production(self) -> "Settings":

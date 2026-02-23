@@ -2,6 +2,7 @@
 import asyncio
 import logging
 import os
+import uuid
 
 from sqlalchemy import func, select
 
@@ -44,6 +45,20 @@ def create_one_key_via_gcp(project_id: str, display_name: str = "ClawHost Gemini
     if not key_string:
         key_string = client.get_key_string(name=result.name).key_string
     return key_string
+
+
+async def create_one_key_for_subscription(project_id: str, subscription_id: uuid.UUID) -> str | None:
+    """Create one Gemini API key via GCP for a new subscription; return key string or None on failure.
+    Used by Stripe webhook so each subscriber gets a dedicated key (stored on instance, injected into OpenClaw).
+    """
+    display_name = f"ClawHost sub {subscription_id.hex[:8]}"
+    try:
+        key_string = await asyncio.to_thread(create_one_key_via_gcp, project_id, display_name)
+        logger.info("Created Gemini API key for subscription %s", subscription_id)
+        return key_string
+    except Exception as e:
+        logger.warning("Failed to create Gemini key for subscription %s: %s", subscription_id, e, exc_info=True)
+        return None
 
 
 async def store_key_in_pool(api_key: str) -> None:

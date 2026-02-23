@@ -146,17 +146,18 @@ export default function InstancesPage() {
                     </a>
                   </div>
                 )}
-                {(["provisioning", "stopped"].includes(inst.status?.toLowerCase() ?? "") && (
+                {inst.status?.toLowerCase() !== "running" && (
                   <Button
                     variant="secondary"
                     size="sm"
                     className="mt-4"
                     onClick={() => handleRetryProvisioning(inst.id)}
                     disabled={retryingId === inst.id}
+                    aria-label="Retry provisioning"
                   >
                     {retryingId === inst.id ? "Retrying…" : "Retry provisioning"}
                   </Button>
-                ))}
+                )}
               </CardContent>
             </Card>
           ))}

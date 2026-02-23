@@ -8,11 +8,33 @@ import { api } from "@/lib/api";
 
 type Sub = { id: string; status: string; plan_type: string; current_period_end: string | null } | null;
 
+type InstanceUsage = {
+  instance_id: string;
+  domain: string | null;
+  tokens_used: number;
+  tokens_cap: number;
+  period_end: string;
+  over_limit: boolean;
+};
+
+type UsageResponse = { instances: InstanceUsage[] };
+
+const formatTokens = (n: number): string => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
+  return String(n);
+};
+
 export default function DashboardPage() {
   const [sub, setSub] = useState<Sub>(undefined as unknown as Sub);
+  const [usage, setUsage] = useState<UsageResponse | undefined>(undefined);
 
   useEffect(() => {
     api<Sub>("/subscription/me").then(setSub).catch(() => setSub(null));
+  }, []);
+
+  useEffect(() => {
+    api<UsageResponse>("/usage").then(setUsage).catch(() => setUsage({ instances: [] }));
   }, []);
 
   return (
@@ -48,6 +70,56 @@ export default function DashboardPage() {
             <Button asChild>
               <Link href="/dashboard/instances">View instances</Link>
             </Button>
+          </CardContent>
+        </Card>
+        <Card className="md:col-span-2">
+          <CardHeader>
+            <CardTitle>Gemini token usage</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {usage === undefined && <p className="text-neutral-400">Loading…</p>}
+            {usage && usage.instances.length === 0 && (
+              <p className="text-neutral-400">No instances yet. Usage is shown per instance after provisioning.</p>
+            )}
+            {usage && usage.instances.length > 0 && (
+              <div className="space-y-4">
+                {usage.instances.map((inst) => {
+                  const pct = Math.min(100, (inst.tokens_used / inst.tokens_cap) * 100);
+                  const label = inst.domain || `Instance ${inst.instance_id.slice(0, 8)}`;
+                  return (
+                    <div key={inst.instance_id} className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium text-neutral-300">{label}</span>
+                        <span className="text-neutral-400">
+                          {formatTokens(inst.tokens_used)} / {formatTokens(inst.tokens_cap)} tokens
+                        </span>
+                      </div>
+                      <div
+                        className="h-2 w-full rounded-full bg-neutral-800 overflow-hidden"
+                        role="progressbar"
+                        aria-valuenow={inst.tokens_used}
+                        aria-valuemin={0}
+                        aria-valuemax={inst.tokens_cap}
+                        aria-label={`Token usage for ${label}`}
+                      >
+                        <div
+                          className={inst.over_limit ? "h-full bg-red-500" : "h-full bg-emerald-500"}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      {inst.over_limit && (
+                        <p className="text-sm text-red-400">
+                          Usage limit reached — API disabled until next period (resets {new Date(inst.period_end).toLocaleDateString()}).
+                        </p>
+                      )}
+                      {!inst.over_limit && (
+                        <p className="text-xs text-neutral-500">Resets {new Date(inst.period_end).toLocaleDateString()}</p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
