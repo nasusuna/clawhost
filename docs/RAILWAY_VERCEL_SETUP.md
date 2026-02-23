@@ -58,7 +58,16 @@ Step-by-step deployment of ClawHost using **Railway** (backend, worker, PostgreS
 2. Go to **"Settings"**:
    - **Root Directory:** Set to `backend`.
    - **Watch Paths:** `backend/**` (optional; ensures rebuilds only when backend changes).
-3. **Start Command:** The repo includes `backend/railway.json` with `uvicorn app.main:app --host 0.0.0.0 --port $PORT`. Railway will use it automatically. If you override in Settings, use the same command.
+3. **Start Command:** The repo no longer sets a start command in `railway.json`, so you **must** set it in Railway for each service:
+   - **Backend:** In the Backend service → Settings → Custom Start Command, set:
+     ```bash
+     alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+     ```
+   - **Worker:** In the Worker service → Settings → Custom Start Command, set:
+     ```bash
+     arq app.queue.worker.WorkerSettings
+     ```
+   (See [Part 3](#part-3-railway--worker-service) for the Worker.)
 
 ### Step 2.3: Add a database (reference)
 
@@ -134,7 +143,11 @@ If you need to run migrations **before** the first deploy (e.g. you created the 
 
 1. Click the new service → **"Settings"**:
    - **Root Directory:** `backend`
-2. **Start Command:** `arq app.queue.worker.WorkerSettings`
+2. **Custom Start Command:** Set to:
+   ```bash
+   arq app.queue.worker.WorkerSettings
+   ```
+   (The start command is not in `railway.json`, so the field is editable in the UI. Do not use the Backend’s command here.)
 
 ### Step 3.3: Set Worker environment variables
 
