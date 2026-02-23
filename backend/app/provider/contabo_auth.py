@@ -1,10 +1,13 @@
 """Contabo OAuth2 token (password grant) with in-memory cache."""
+import logging
 import time
 from typing import Any
 
 import httpx
 
 from app.config import settings
+
+logger = logging.getLogger("app.provider.contabo_auth")
 
 CONTABO_AUTH_URL = "https://auth.contabo.com/auth/realms/contabo/protocol/openid-connect/token"
 
@@ -39,6 +42,16 @@ async def get_contabo_token() -> str | None:
             headers={"Content-Type": "application/x-www-form-urlencoded"},
         )
     if resp.status_code != 200:
+        try:
+            err_body = resp.json()
+            err_msg = err_body.get("error_description") or err_body.get("error") or resp.text[:200]
+        except Exception:
+            err_msg = resp.text[:200] if resp.text else "(no body)"
+        logger.warning(
+            "Contabo OAuth token request failed status=%s body=%s",
+            resp.status_code,
+            err_msg,
+        )
         _token = None
         return None
     body: dict[str, Any] = resp.json()

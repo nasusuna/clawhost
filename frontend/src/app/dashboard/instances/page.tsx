@@ -146,7 +146,7 @@ export default function InstancesPage() {
                     </a>
                   </div>
                 )}
-                {inst.status === "provisioning" && (
+                {(["provisioning", "stopped"].includes(inst.status?.toLowerCase() ?? "") && (
                   <Button
                     variant="secondary"
                     size="sm"
@@ -156,7 +156,7 @@ export default function InstancesPage() {
                   >
                     {retryingId === inst.id ? "Retrying…" : "Retry provisioning"}
                   </Button>
-                )}
+                ))}
               </CardContent>
             </Card>
           ))}

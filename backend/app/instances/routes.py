@@ -97,17 +97,17 @@ async def retry_provisioning(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
-    """Re-enqueue provisioning job for an instance stuck in provisioning."""
+    """Re-enqueue provisioning job for an instance stuck in provisioning or stopped (e.g. after fixing Contabo)."""
     result = await session.execute(
         select(Instance).where(Instance.id == instance_id, Instance.user_id == user.id)
     )
     instance = result.scalar_one_or_none()
     if not instance:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Instance not found")
-    if instance.status != InstanceStatus.provisioning:
+    if instance.status not in (InstanceStatus.provisioning, InstanceStatus.stopped):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Instance is not in provisioning state",
+            detail="Retry only allowed for provisioning or stopped instances",
         )
     if not instance.subscription_id:
         raise HTTPException(
@@ -120,5 +120,10 @@ async def retry_provisioning(
     subscription = sub_result.scalar_one_or_none()
     if not subscription:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Subscription not found")
+    # So the worker finds this instance, set status to provisioning (and clear job id for a fresh run)
+    instance.status = InstanceStatus.provisioning
+    instance.provision_job_id = None
+    session.add(instance)
+    await session.commit()
     await enqueue_provision_job(user.id, instance.subscription_id, subscription.plan_type)
     return {"ok": True, "message": "Provisioning job enqueued. Worker will process it shortly."}
