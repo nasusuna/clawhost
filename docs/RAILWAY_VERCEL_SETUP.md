@@ -58,15 +58,9 @@ Step-by-step deployment of ClawHost using **Railway** (backend, worker, PostgreS
 2. Go to **"Settings"**:
    - **Root Directory:** Set to `backend`.
    - **Watch Paths:** `backend/**` (optional; ensures rebuilds only when backend changes).
-3. **Start Command:** `backend/railway.json` does **not** set a start command, so you **must** set it in Railway for each service (the UI is editable when no startCommand is in the file):
-   - **Backend (e.g. clawhost):** Settings → Custom Start Command:
-     ```bash
-     sh -c 'uvicorn app.main:app --host 0.0.0.0 --port $PORT'
-     ```
-   - **Worker (e.g. intelligent-smile or second service):** Settings → Custom Start Command:
-     ```bash
-     arq app.queue.worker.WorkerSettings
-     ```
+3. **Start Command:** The repo uses a single start command in `backend/railway.json` that runs **Worker** (arq) when `CLAWHOST_RUN_WORKER` is set, otherwise **Backend** (uvicorn). Set the env var only on the Worker service:
+   - **Backend (e.g. clawhost):** Do **not** set `CLAWHOST_RUN_WORKER`. It will run: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+   - **Worker (e.g. intelligent-smile):** In **Variables**, add `CLAWHOST_RUN_WORKER` = `true` (any non-empty value). It will run: `arq app.queue.worker.WorkerSettings`.
    (See [Part 3](#part-3-railway--worker-service) for the Worker.)
 
 ### Step 2.3: Add a database (reference)
@@ -143,7 +137,7 @@ If you need to run migrations **before** the first deploy (e.g. you created the 
 
 1. Click the new service → **"Settings"**:
    - **Root Directory:** `backend`
-2. **Custom Start Command:** Set to:
+2. The start command is in `backend/railway.json` and runs the Worker when `CLAWHOST_RUN_WORKER` is set. In **Variables**, add `CLAWHOST_RUN_WORKER` = `true`. So this service runs arq; the Backend does not set this var and runs uvicorn.
    ```bash
    arq app.queue.worker.WorkerSettings
    ```
