@@ -1,5 +1,5 @@
 """Application configuration from environment."""
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +15,13 @@ class Settings(BaseSettings):
     cors_allowed_origins: str = ""
 
     database_url: str = "postgresql+asyncpg://user:password@localhost:5432/clawhost"
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_url(cls, v: str) -> str:
+        if v and v.startswith("postgresql://") and not v.startswith("postgresql+asyncpg://"):
+            return "postgresql+asyncpg://" + v.removeprefix("postgresql://")
+        return v
 
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 60

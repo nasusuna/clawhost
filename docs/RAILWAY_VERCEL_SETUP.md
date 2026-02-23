@@ -106,18 +106,12 @@ In **Variables** for the Backend service, add:
 
 ### Step 2.5: Run database migrations
 
-1. In Railway, you can run a **one-off command** via the CLI or a temporary job.
-2. **Option A — Railway CLI:**
-   ```bash
-   npm i -g @railway/cli
-   railway login
-   railway link   # select your project
-   cd backend
-   railway run alembic upgrade head
-   ```
-3. **Option B — Local with production DB:**
-   - Copy `DATABASE_URL` from Railway (with `postgresql+asyncpg`).
-   - In your `backend` folder: `DATABASE_URL="..." alembic upgrade head`
+Migrations run **automatically** on every Backend deploy: the start command in `backend/railway.json` runs `alembic upgrade head` before starting the API. So after the first successful deploy, the database will be up to date.
+
+If you need to run migrations **before** the first deploy (e.g. you created the DB by hand), use one of these:
+
+1. **Option A — Deploy once:** Push your code and let the Backend deploy. The start command will run migrations then start uvicorn. Check Backend logs to confirm “alembic upgrade head” completed.
+2. **Option B — Local with public DB URL:** Railway’s Postgres service may expose a **public** URL. In Railway → Postgres → Variables (or Connect), copy the public `DATABASE_URL`. Convert to `postgresql+asyncpg://...` and add `?ssl=require` if needed. Then run locally (with venv activated): `$env:DATABASE_URL="..."; alembic upgrade head`. Note: `railway run alembic upgrade head` from your PC often fails with “getaddrinfo failed” because Railway’s default DB hostname is only reachable from inside Railway’s network.
 
 ### Step 2.6: Generate domain for Backend
 
@@ -159,25 +153,49 @@ In **Variables** for the Backend service, add:
 
 ## Part 4: Stripe Webhook
 
-### Step 4.1: Create webhook in Stripe
+Create a webhook in Stripe so your backend is notified when a customer completes checkout, a payment fails, or a subscription is canceled.
 
-1. Go to [Stripe Dashboard](https://dashboard.stripe.com) → **Developers** → **Webhooks**.
-2. Click **"Add endpoint"**.
-3. **Endpoint URL:** `https://YOUR-RAILWAY-BACKEND-DOMAIN/webhooks/stripe`
-   - Example: `https://clawhost-backend-production-xxxx.up.railway.app/webhooks/stripe`
-4. **Events to send:**
-   - `checkout.session.completed`
-   - `invoice.payment_failed`
-   - `customer.subscription.deleted`
-5. Click **"Add endpoint"**.
-6. Open the new webhook → **"Reveal"** signing secret.
-7. Copy the value (starts with `whsec_`).
+### Step 4.1: Create the webhook in Stripe (clear steps)
+
+1. **Open Stripe Dashboard**
+   - Go to [https://dashboard.stripe.com](https://dashboard.stripe.com) and sign in.
+   - Switch to **Live** or **Test** mode (top-right) depending on which keys you use in Railway.
+
+2. **Open Webhooks**
+   - Left sidebar → **Developers** → **Webhooks**.
+   - Click **"+ Add endpoint"**.
+
+3. **Endpoint URL**
+   - In **Endpoint URL**, enter:
+     ```text
+     https://YOUR-RAILWAY-BACKEND-DOMAIN/webhooks/stripe
+     ```
+   - Replace `YOUR-RAILWAY-BACKEND-DOMAIN` with your Backend’s Railway domain (e.g. `clawhost-backend-production-xxxx.up.railway.app`).
+   - Use `https://` and **no trailing slash**. Example:
+     ```text
+     https://clawhost-backend-production-xxxx.up.railway.app/webhooks/stripe
+     ```
+
+4. **Events to send**
+   - Under **Select events to listen to**, choose **“Select events”** (do not use “Listen to all events”).
+   - Add these three events (use the search box or scroll):
+     - **`checkout.session.completed`** — when a customer finishes checkout (create subscription + start provisioning).
+     - **`invoice.payment_failed`** — when a recurring payment fails (optional handling in your app).
+     - **`customer.subscription.deleted`** — when a subscription is canceled (release instance / key pool).
+   - Click **“Add endpoint”**.
+
+5. **Get the signing secret**
+   - On the new webhook’s page, under **Signing secret**, click **“Reveal”**.
+   - Copy the value (it starts with **`whsec_`**). You will use it in Railway as `STRIPE_WEBHOOK_SECRET`.
 
 ### Step 4.2: Add webhook secret to Railway
 
-1. Backend service → **Variables**.
-2. Set `STRIPE_WEBHOOK_SECRET` = `whsec_...` (the value you copied).
-3. Redeploy if needed.
+1. In Railway, open your **Backend** service.
+2. Go to the **Variables** tab.
+3. Add (or edit) a variable:
+   - **Name:** `STRIPE_WEBHOOK_SECRET`
+   - **Value:** the `whsec_...` value you copied from Stripe.
+4. Save. Redeploy the Backend if it was already running so it picks up the new variable.
 
 ---
 
