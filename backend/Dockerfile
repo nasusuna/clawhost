@@ -12,6 +12,6 @@ COPY alembic ./alembic
 COPY alembic.ini .
 COPY app ./app
 
-# Run API (use gunicorn with uvicorn workers for production)
+# Run API: migrations then gunicorn. Bind to $PORT (Railway) or 8000.
 RUN pip install --no-cache-dir gunicorn
-CMD ["gunicorn", "app.main:app", "-k", "uvicorn.workers.UvicornWorker", "-w", "2", "-b", "0.0.0.0:8000"]
+CMD ["sh", "-c", "alembic upgrade head && gunicorn app.main:app -k uvicorn.workers.UvicornWorker -w 2 -b 0.0.0.0:${PORT:-8000}"]
