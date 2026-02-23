@@ -15,6 +15,6 @@ COPY alembic ./alembic
 COPY alembic.ini .
 COPY app ./app
 
-# Run API: migrations then server. Use uvicorn for fast startup (Railway); bind to $PORT.
-RUN pip install --no-cache-dir gunicorn
-CMD ["sh", "-c", "set -e; alembic upgrade head; exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Run API. Listen on $PORT immediately so Railway marks the container as started.
+# Run migrations once via Railway CLI or one-off: railway run alembic upgrade head
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
