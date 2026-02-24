@@ -99,16 +99,20 @@ Granting **Project Creator** at the **organization** level lets the service acco
 
 ---
 
-### 2.5 Grant billing account roles (Billing User, Budget Admin)
+### 2.5 Grant billing account roles (Billing User, budget creation)
+
+The service account must be able to **link projects to the billing account** (permission `billing.resourceAssociations.create`) and create budgets. Grant roles **on the billing account** (not on a project):
 
 1. Go to **Billing** → [Billing](https://console.cloud.google.com/billing) → select your billing account.
-2. Open **Manage account access** (or **Permissions**).
-3. Click **Add members**.
-4. **Principal:** same service account email.
-5. **Roles:** add:
-   - **Billing** → **Billing Account User** (so the SA can link projects to this billing account).
-   - **Billing** → **Budget Admin** (so the SA can create budgets).
+2. Open **Manage account access** (or **Account management** → **Permissions** / **IAM**).
+3. Click **Add members** (or **Grant access**).
+4. **Principal:** paste the **service account email** (e.g. `clawhost-project-creator@your-project.iam.gserviceaccount.com`).
+5. **Roles:** add **both**:
+   - **Billing** → **Billing Account User** (grants `billing.resourceAssociations.create` so the SA can link projects to this billing account).
+   - **Billing** → **Billing Account Costs Manager** or **Billing Account Administrator** (so the SA can create budgets; there is no "Budget Admin" role in the console).
 6. Save.
+
+If you see **403 PERMISSION_DENIED** with `billing.resourceAssociations.create` in logs, the principal making the request does not have **Billing Account User** on this billing account — add the SA here and wait a minute for IAM to propagate.
 
 ### 2.6 Confirm the service account gets Owner on new projects (or add org-level roles)
 
@@ -181,12 +185,12 @@ If **API Keys Admin** (or Service Usage Admin) is **not available** when the res
 - **Project Creator** (already done).
 - **Service Usage Admin** (organization level if your console allows it; otherwise the service account may need to be granted **Owner** or **Editor** on the **new** project via a **folder** or **organization** default. Google’s default is that the **creator** of a project is not automatically an owner. So you have two options:
   - **Option 1:** Use a **folder** under the org, grant the SA **Owner** on that folder, and create projects under that folder (would require a small code change to pass folder as parent).
-  - **Option 2:** After creating the project, the backend uses the **same** credentials; for **new projects**, the Cloud Resource Manager API often leaves the creating identity with access. Verify in [Creating and managing projects](https://cloud.google.com/resource-manager/docs/creating-managing-projects): “When you create a project, you become the owner of that project.” So the **service account** that creates the project should get **Owner** on it. In that case you only need **Project Creator** at org, **Billing Account User** and **Budget Admin** on the billing account, and the SA will have Owner on each new project and can enable APIs and create keys.
+  - **Option 2:** After creating the project, the backend uses the **same** credentials; for **new projects**, the Cloud Resource Manager API often leaves the creating identity with access. Verify in [Creating and managing projects](https://cloud.google.com/resource-manager/docs/creating-managing-projects): “When you create a project, you become the owner of that project.” So the **service account** that creates the project should get **Owner** on it. In that case you only need **Project Creator** at org, **Billing Account User** and **Billing Account Costs Manager** (or **Billing Account Administrator**) on the billing account, and the SA will have Owner on each new project and can enable APIs and create keys.
 
 So minimal setup:
 
 - **Organization:** Service account has **Project Creator**.
-- **Billing account:** Service account has **Billing Account User** and **Budget Admin**.
+- **Billing account:** Service account has **Billing Account User** and **Billing Account Costs Manager** (or **Billing Account Administrator**).
 - **New projects:** Created by this SA, so the SA is **Owner** of each new project and can enable Service Usage and create API keys.
 
 ---
@@ -349,8 +353,8 @@ The backend creates a **budget** with a **100% threshold** (alert when spend rea
 |--------|----------------|
 | “Permission denied” creating project | SA has **Project Creator** on the **organization** (not only on a project). |
 | “Permission denied” enabling API or creating key | SA is **Owner** of the new project (creator usually is), or has **Service Usage Admin** and **API Keys Admin** (org/folder/project as applicable). |
-| “Permission denied” linking billing | SA has **Billing Account User** on the **billing account**. |
-| “Permission denied” creating budget | SA has **Budget Admin** on the **billing account**. |
+| “Permission denied” linking billing | SA has **Billing Account User** on the **billing account**. Grant it under Billing → [your account] → Manage account access → Add members → SA email + role **Billing Account User**. If logs show `billing.resourceAssociations.create`, the SA is missing that role on this billing account. |
+| “Permission denied” creating budget | SA has **Billing Account Costs Manager** or **Billing Account Administrator** on the **billing account**. |
 | “Organization not found” or “Parent invalid” | `GCP_ORGANIZATION_ID` is the **numeric** org ID; no `organizations/` prefix. |
 | “Billing account not found” | `GCP_BILLING_ACCOUNT_ID` is correct; use either `01ABC...` or `billingAccounts/01ABC...`. |
 | Webhook creates subscription but no project | Backend logs for the webhook run; look for Python tracebacks from `create_project_and_setup`. Ensure `GCP_PROJECT_PER_SUBSCRIPTION_ENABLED=true` and both org and billing ID are set. |
@@ -362,7 +366,7 @@ The backend creates a **budget** with a **100% threshold** (alert when spend rea
 
 - [ ] Migration `006_add_subscription_gcp_project_id` applied (`alembic upgrade head`).
 - [ ] GCP Organization ID and Billing Account ID noted.
-- [ ] Service account created; granted **Project Creator** (org), **Billing Account User** and **Budget Admin** (billing account).
+- [ ] Service account created; granted **Project Creator** (org), **Billing Account User** and **Billing Account Costs Manager** or **Billing Account Administrator** (billing account).
 - [ ] Required APIs enabled (Resource Manager, Service Usage, Cloud Billing, Billing Budgets, API Keys, Generative Language).
 - [ ] Service account key JSON downloaded and stored securely.
 - [ ] Backend and Worker env set: `GCP_PROJECT_PER_SUBSCRIPTION_ENABLED=true`, `GCP_ORGANIZATION_ID`, `GCP_BILLING_ACCOUNT_ID`, `GCP_BUDGET_AMOUNT_USD` (optional), `GOOGLE_APPLICATION_CREDENTIALS` (path or inline).
