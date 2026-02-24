@@ -36,8 +36,12 @@ class User(Base):
     stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    subscriptions: Mapped[list["Subscription"]] = relationship("Subscription", back_populates="user")
-    instances: Mapped[list["Instance"]] = relationship("Instance", back_populates="user")
+    subscriptions: Mapped[list["Subscription"]] = relationship(
+        "Subscription", back_populates="user", cascade="all, delete-orphan"
+    )
+    instances: Mapped[list["Instance"]] = relationship(
+        "Instance", back_populates="user", cascade="all, delete-orphan"
+    )
 
 
 class Subscription(Base):
