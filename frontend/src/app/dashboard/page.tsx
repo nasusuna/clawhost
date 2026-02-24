@@ -74,6 +74,21 @@ export default function DashboardPage() {
         </Card>
         <Card className="md:col-span-2">
           <CardHeader>
+            <CardTitle>Account</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-neutral-400 mb-4">Manage your profile or permanently delete your account and all data.</p>
+            <Button
+              variant="outline"
+              className="border-red-500/50 text-red-400 hover:bg-red-500/10 hover:text-red-300"
+              asChild
+            >
+              <Link href="/dashboard/account">Manage account & delete account</Link>
+            </Button>
+          </CardContent>
+        </Card>
+        <Card className="md:col-span-2">
+          <CardHeader>
             <CardTitle>Gemini token usage</CardTitle>
           </CardHeader>
           <CardContent>
