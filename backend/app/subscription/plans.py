@@ -7,8 +7,8 @@ PLAN_PRO = "pro"
 PLANS = {
     PLAN_STARTER: {
         "name": "Starter",
-        "vcpu": 2,
-        "memory_gb": 4,
+        "vcpu": 4,
+        "memory_gb": 8,
         "stripe_price_id_key": "stripe_starter_price_id",
     },
     PLAN_PRO: {

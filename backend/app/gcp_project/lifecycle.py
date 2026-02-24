@@ -135,11 +135,13 @@ def create_budget_for_project(
     amount_usd: float = 15.0,
     display_name: str | None = None,
 ) -> None:
-    """Create a monthly budget for the project (alerts at 100%). Sync."""
+    """Create a monthly budget for the project (alerts at 100%). Sync. No-op if google-cloud-billing-budgets not installed."""
     if BudgetServiceClient is None or Budget is None:
-        raise RuntimeError(
-            "google-cloud-billing-budgets is not installed; pip install google-cloud-billing-budgets"
+        logger.warning(
+            "Skipping budget creation: google-cloud-billing-budgets not installed. "
+            "Add to requirements.txt and redeploy to create budgets. pip install google-cloud-billing-budgets"
         )
+        return
     # specified_amount: Money with units (int) and nanos (int for fractional). $15 = 15 units, 0 nanos.
     units = int(amount_usd)
     nanos = int((amount_usd - units) * 1_000_000_000)
