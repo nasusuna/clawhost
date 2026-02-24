@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
-import DeployWidget from "@/components/DeployWidget";
+import UseCasesWidget from "@/components/UseCasesWidget";
 import ComparisonSection from "@/components/ComparisonSection";
 import FeaturesSection from "@/components/FeaturesSection";
 import PricingSection from "@/components/PricingSection";
+import ReviewsSection from "@/components/ReviewsSection";
 import FAQSection from "@/components/FAQSection";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/components/AuthProvider";
@@ -97,9 +98,9 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Right: Deploy Widget */}
+          {/* Right: Use Cases Widget */}
           <div className="flex animate-fade-in animate-float justify-center md:justify-end">
-            <DeployWidget />
+            <UseCasesWidget />
           </div>
         </div>
 
@@ -130,6 +131,7 @@ export default function HomePage() {
       <ComparisonSection />
       <FeaturesSection />
       <PricingSection />
+      <ReviewsSection />
       <FAQSection />
 
       {/* CTA Section */}

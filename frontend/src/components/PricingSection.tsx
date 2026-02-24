@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { Check } from "lucide-react";
-import { useState } from "react";
 
 const plans = [
   {
     name: "Starter",
-    price: { monthly: 39.99, yearly: 31.99 },
+    price: 39.99,
     desc: "Perfect for personal use",
     features: [
       "1 AI agent",
@@ -22,8 +21,6 @@ const plans = [
 ];
 
 export default function PricingSection() {
-  const [yearly, setYearly] = useState(false);
-
   return (
     <section id="pricing" className="px-6 py-24">
       <div className="mx-auto max-w-5xl">
@@ -33,28 +30,6 @@ export default function PricingSection() {
             Simple, transparent pricing
           </h2>
           <p className="mb-8 text-lg text-muted-foreground">Start free. Scale as you grow.</p>
-
-          <div className="inline-flex items-center gap-3 rounded-xl border border-border bg-secondary p-1">
-            <button
-              type="button"
-              onClick={() => setYearly(false)}
-              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-all ${
-                !yearly ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
-              }`}
-            >
-              Monthly
-            </button>
-            <button
-              type="button"
-              onClick={() => setYearly(true)}
-              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-all ${
-                yearly ? "bg-card text-foreground shadow-sm" : "text-muted-foreground"
-              }`}
-            >
-              Yearly
-              <span className="ml-1.5 text-xs text-brand-cyan">-20%</span>
-            </button>
-          </div>
         </div>
 
         <div className="mx-auto grid max-w-md grid-cols-1 gap-6">
@@ -85,7 +60,7 @@ export default function PricingSection() {
                 <p className="mb-4 text-sm text-muted-foreground">{plan.desc}</p>
                 <div className="flex items-end gap-1">
                   <span className="text-4xl font-bold font-mono text-foreground">
-                    ${(yearly ? plan.price.yearly : plan.price.monthly).toFixed(2)}
+                    ${plan.price.toFixed(2)}
                   </span>
                   <span className="mb-1 text-sm text-muted-foreground">/mo</span>
                 </div>
