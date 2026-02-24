@@ -212,6 +212,28 @@ Ensure `NEXT_PUBLIC_API_URL` points to your production backend (e.g. `https://ap
 - Configure Cloudflare (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID`) so provisioning creates A records automatically.
 - Each instance gets `{id}.customers.clawhost.com` → VPS IP; Certbot on the VPS handles SSL for those subdomains.
 
+### End-to-end automation: Subscribe → OpenClaw running
+
+For a user to click Subscribe and end up with a working OpenClaw they can chat in, all of the following must be in place:
+
+| Step | What happens | Required |
+|------|----------------|----------|
+| 1. Subscribe | User clicks Subscribe → Stripe Checkout → payment succeeds | Stripe live keys, webhook URL, `STRIPE_*` on Backend |
+| 2. Webhook | `checkout.session.completed` → Backend creates Subscription + Instance (provisioning), enqueues `provision_instance` | Webhook secret, Worker connected to same Redis |
+| 3. Worker | ARQ runs `provision_instance`: sets instance domain + gateway token, (optional) creates GCP project + Gemini key | `CONTABO_*` on **Worker**, optional GCP per-subscription |
+| 4. VPS | Contabo `create_vps` with cloud-init: Docker, Nginx, OpenClaw image, `/root/openclaw.json` (with `dangerouslyAllowHostHeaderOriginFallback`), token in file, Certbot | Correct `CONTABO_API_URL` (e.g. `https://api.contabo.com`) |
+| 5. DNS | After VPS is running, create A record `{domain}` → instance IP | `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ZONE_ID` on Worker; zone = `CLAWHOST_BASE_DOMAIN` |
+| 6. Instance ready | Instance status → `running`, user sees "Start OpenClaw" in dashboard with `https://{domain}/?token=...` | User opens dashboard → Instances → link works |
+
+**Checklist for full automation:**
+
+- [ ] Backend: Stripe webhook, DB, Redis, CORS.
+- [ ] Worker: same DB + Redis; `CONTABO_*`; `CLAWHOST_BASE_DOMAIN`; `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ZONE_ID` (so instance domain resolves).
+- [ ] Cloudflare zone for `CLAWHOST_BASE_DOMAIN` (e.g. `customers.clawhost.com`) so A records can be created.
+- [ ] Frontend: `NEXT_PUBLIC_API_URL` → backend; user can open Dashboard → Instances and use "Start OpenClaw" link.
+
+If DNS is not configured, the instance still gets an IP; the dashboard "Start OpenClaw" link can use `http://{ip}/?token=...` when domain is missing, but HTTPS and a friendly URL require DNS + Certbot (step 5).
+
 ---
 
 ## 11. Security Checklist

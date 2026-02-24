@@ -7,16 +7,25 @@ import { api } from "@/lib/api";
 
 type Plan = { id: string; name: string; vcpu: number; memory_gb: number };
 
+type Sub = { id: string; status: string; plan_type: string; current_period_end: string | null } | null;
+
 export default function SubscribePage() {
   const [plans, setPlans] = useState<Plan[]>([]);
+  const [sub, setSub] = useState<Sub>(undefined as unknown as Sub);
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     api<Plan[]>("/subscription/plans")
-      .then(setPlans)
+      .then((all) => setPlans(all.filter((p) => p.id === "starter")))
       .catch(() => setPlans([]));
   }, []);
+
+  useEffect(() => {
+    api<Sub>("/subscription/me").then(setSub).catch(() => setSub(null));
+  }, []);
+
+  const isActiveSub = sub && sub.status === "active";
 
   const handleSubscribe = async (planType: string) => {
     setError("");
@@ -66,12 +75,18 @@ export default function SubscribePage() {
               </p>
             </CardHeader>
             <CardContent>
-              <Button
-                onClick={() => handleSubscribe(plan.id)}
-                disabled={loading !== null}
-              >
-                {loading === plan.id ? "Redirecting…" : "Subscribe"}
-              </Button>
+              {isActiveSub ? (
+                <Button disabled variant="secondary">
+                  Active
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => handleSubscribe(plan.id)}
+                  disabled={loading !== null}
+                >
+                  {loading === plan.id ? "Redirecting…" : "Subscribe"}
+                </Button>
+              )}
             </CardContent>
           </Card>
         ))}

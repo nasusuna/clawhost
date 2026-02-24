@@ -55,7 +55,10 @@ def _openclaw_gemini_config_json(gemini_api_key: str | None = None) -> str:
             "port": 18789,
             "mode": "local",
             "bind": "lan",
-            "controlUi": {"dangerouslyDisableDeviceAuth": True},
+            "controlUi": {
+                "dangerouslyDisableDeviceAuth": True,
+                "dangerouslyAllowHostHeaderOriginFallback": True,
+            },
             "auth": {"mode": "token", "token": "__OPENCLAW_REDACTED__"},
             "trustedProxies": ["127.0.0.1", "::1"],
             "tls": {"enabled": False},
@@ -87,8 +90,8 @@ def _cloud_init_user_data(
     port = settings.openclaw_app_port
     openclaw_json = _openclaw_gemini_config_json(gemini_api_key)
 
-    # Escape gateway_token for shell (single-quote wrap: ' -> '\'')
-    gate_esc = gateway_token.replace("'", "'\"'\"'")
+    # Store gateway token in a file (base64) so runcmd never embeds it; avoids shell quoting issues.
+    gateway_token_b64 = base64.b64encode(gateway_token.encode()).decode()
 
     write_files = f"""  - path: /etc/nginx/sites-available/openclaw
     content: |
@@ -110,6 +113,9 @@ def _cloud_init_user_data(
   - path: /root/openclaw.json
     content: |
       {openclaw_json}
+  - path: /root/openclaw_gateway_token.b64
+    content: |
+      {gateway_token_b64}
 """
     if gemini_api_key:
         gemini_b64 = base64.b64encode(gemini_api_key.encode()).decode()
@@ -117,19 +123,26 @@ def _cloud_init_user_data(
     content: |
       {gemini_b64}
 """
+    # Read token from file in runcmd so no token chars appear in the script (fixes "Unterminated quoted string").
+    docker_run_base = (
+        f"docker run -d --restart always --name openclaw -p 127.0.0.1:{port}:18789 "
+        f"-v /root/openclaw.json:/home/node/.openclaw/openclaw.json "
+        f"-e OPENCLAW_GATEWAY_TOKEN=\"$(base64 -d /root/openclaw_gateway_token.b64)\" "
+    )
+    docker_run_tail = f"--security-opt no-new-privileges --cpus=2 --memory=4g {image}"
     if not gemini_api_key:
         runcmd = f"""
   - curl -fsSL https://get.docker.com | sh
   - apt-get update && apt-get install -y nginx certbot python3-certbot-nginx
   - chmod 666 /root/openclaw.json
-  - docker run -d --restart always --name openclaw -p 127.0.0.1:{port}:18789 -v /root/openclaw.json:/home/node/.openclaw/openclaw.json -e OPENCLAW_GATEWAY_TOKEN='{gate_esc}' --security-opt no-new-privileges --cpus=2 --memory=4g {image}
+  - bash -c '{docker_run_base}{docker_run_tail}'
 """
     else:
         runcmd = f"""
   - curl -fsSL https://get.docker.com | sh
   - apt-get update && apt-get install -y nginx certbot python3-certbot-nginx
   - chmod 666 /root/openclaw.json
-  - bash -c 'GEMINI_API_KEY=$(base64 -d /root/gemini_key.b64 2>/dev/null || true); docker run -d --restart always --name openclaw -p 127.0.0.1:{port}:18789 -v /root/openclaw.json:/home/node/.openclaw/openclaw.json -e OPENCLAW_GATEWAY_TOKEN=\\'{gate_esc}\\' -e GEMINI_API_KEY="$GEMINI_API_KEY" --security-opt no-new-privileges --cpus=2 --memory=4g {image}'
+  - bash -c '{docker_run_base}-e GEMINI_API_KEY=\"$(base64 -d /root/gemini_key.b64 2>/dev/null || echo)\" {docker_run_tail}'
 """
     return f"""#cloud-config
 package_update: true

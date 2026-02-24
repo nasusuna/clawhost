@@ -19,6 +19,67 @@ type InstanceUsage = {
 
 type UsageResponse = { instances: InstanceUsage[] };
 
+type Instance = {
+  id: string;
+  status: string;
+  domain: string | null;
+  ip_address: string | null;
+  gateway_token: string | null;
+};
+
+function StartOpenClawCard() {
+  const [instances, setInstances] = useState<Instance[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    api<Instance[]>("/instances")
+      .then(setInstances)
+      .catch(() => setInstances([]))
+      .finally(() => setLoading(false));
+  }, []);
+  const running = instances.find(
+    (i) => i.status === "running" && (i.domain || i.ip_address) && i.gateway_token
+  );
+  const openClawUrl =
+    running &&
+    (running.domain
+      ? `https://${running.domain}/?token=${encodeURIComponent(running.gateway_token!)}`
+      : `http://${running.ip_address}/?token=${encodeURIComponent(running.gateway_token!)}`);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Start OpenClaw</CardTitle>
+      </CardHeader>
+      <CardContent>
+        {loading && <p className="text-neutral-400">Loading…</p>}
+        {!loading && openClawUrl && (
+          <>
+            <p className="text-neutral-400 mb-4">Open your OpenClaw instance and start chatting.</p>
+            <Button asChild>
+              <a
+                href={openClawUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center"
+              >
+                Start OpenClaw
+              </a>
+            </Button>
+          </>
+        )}
+        {!loading && !openClawUrl && (
+          <>
+            <p className="text-neutral-400 mb-4">No running instance yet. View instances to check status or retry.</p>
+            <Button asChild>
+              <Link href="/dashboard/instances">View instances</Link>
+            </Button>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 const formatTokens = (n: number): string => {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
@@ -39,19 +100,7 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <Button
-          variant="outline"
-          size="sm"
-          className="border-red-500/60 text-red-400 hover:bg-red-500/15 hover:text-red-300"
-          asChild
-        >
-          <Link href="/dashboard/account" aria-label="Delete account">
-            Delete account
-          </Link>
-        </Button>
-      </div>
+      <h1 className="text-2xl font-semibold">Dashboard</h1>
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
@@ -73,17 +122,7 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Instances</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-neutral-400 mb-4">View and manage your OpenClaw instances.</p>
-            <Button asChild>
-              <Link href="/dashboard/instances">View instances</Link>
-            </Button>
-          </CardContent>
-        </Card>
+        <StartOpenClawCard />
         <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle>Account</CardTitle>

@@ -38,16 +38,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </nav>
         <div className="flex items-center gap-4">
           <span className="text-sm text-neutral-400">{user?.email}</span>
-          <Button
-            variant="outline"
-            size="sm"
-            className="border-red-500/60 text-red-400 hover:bg-red-500/15 hover:text-red-300"
-            asChild
-          >
-            <Link href="/dashboard/account" aria-label="Delete account">
-              Delete account
-            </Link>
-          </Button>
           <Button variant="ghost" size="sm" onClick={() => { logout(); router.push("/"); }}>Log out</Button>
         </div>
       </header>
