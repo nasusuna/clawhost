@@ -1,6 +1,7 @@
 """Create a GCP project per subscription: project, enable API, link billing, create budget. All sync for use in asyncio.to_thread."""
 import logging
 import re
+import time
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -93,6 +94,7 @@ def link_billing_account(project_id: str, billing_account_name: str) -> None:
     # Only set billing_account_name in the body; including name in the body can cause 400 InvalidArgument.
     info = billing_v1.ProjectBillingInfo(billing_account_name=billing_account_name)
     client = billing_v1.CloudBillingClient()
+    logger.info("Linking project %s to billing account %s", project_id, billing_account_name)
     client.update_project_billing_info(name=name, project_billing_info=info)
     logger.info("Linked project %s to billing account %s", project_id, billing_account_name)
 
@@ -160,6 +162,9 @@ def create_project_and_setup(
     try:
         create_project(organization_id, project_id, display_name)
         _enable_generative_language_api(project_id)
+        # New projects need time to propagate before Billing API accepts the link; otherwise 400 Invalid Argument.
+        logger.info("Waiting 10s for project %s to propagate before linking billing", project_id)
+        time.sleep(10)
         link_billing_account(project_id, billing_name)
         create_budget_for_project(billing_name, project_id, amount_usd=amount_usd, display_name=display_name)
         return project_id
