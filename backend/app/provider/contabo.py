@@ -75,13 +75,19 @@ class ContaboClient(ProviderClient):
             # Optional: use Secrets API to create password secret and set body["rootPassword"] = secret_id
             pass
         async with httpx.AsyncClient(timeout=60.0) as client:
+            url = f"{self.api_url}/v1/compute/instances"
             resp = await client.post(
-                f"{self.api_url}/v1/compute/instances",
+                url,
                 json=body,
                 headers=self._headers(token),
             )
         if resp.status_code not in (200, 201):
-            raise RuntimeError(f"Contabo create_vps failed: {resp.status_code} {resp.text}")
+            # Log URL so misconfiguration (e.g. wrong CONTABO_API_URL pointing to Google) is visible
+            msg = f"Contabo create_vps failed: {resp.status_code} url={self.api_url}/v1/compute/instances"
+            if resp.status_code == 404 and "google" in (resp.text or "").lower():
+                msg += " (response looks like Google 404 — check CONTABO_API_URL is https://api.contabo.com)"
+            msg += f" body={resp.text[:200] if resp.text else ''}"
+            raise RuntimeError(msg)
         data = resp.json()
         items = data.get("data") or []
         if not items:
