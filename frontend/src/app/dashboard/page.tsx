@@ -39,7 +39,19 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-semibold">Dashboard</h1>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <h1 className="text-2xl font-semibold">Dashboard</h1>
+        <Button
+          variant="outline"
+          size="sm"
+          className="border-red-500/60 text-red-400 hover:bg-red-500/15 hover:text-red-300"
+          asChild
+        >
+          <Link href="/dashboard/account" aria-label="Delete account">
+            Delete account
+          </Link>
+        </Button>
+      </div>
       <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader>
