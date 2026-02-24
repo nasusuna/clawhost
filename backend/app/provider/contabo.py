@@ -36,7 +36,10 @@ class ContaboClient(ProviderClient):
     """Contabo VPS API via OAuth2 and REST. Auth from settings (get_contabo_token)."""
 
     def __init__(self, api_url: str) -> None:
-        self.api_url = api_url.rstrip("/")
+        url = (api_url or "").strip().rstrip("/")
+        if url and not url.startswith(("http://", "https://")):
+            url = f"https://{url}"
+        self.api_url = url or "https://api.contabo.com"
 
     def _headers(self, token: str) -> dict[str, str]:
         return {

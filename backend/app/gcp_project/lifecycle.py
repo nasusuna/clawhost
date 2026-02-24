@@ -90,7 +90,8 @@ def link_billing_account(project_id: str, billing_account_name: str) -> None:
     if not billing_v1:
         raise RuntimeError("google-cloud-billing is not installed; pip install google-cloud-billing")
     name = f"projects/{project_id}/billingInfo"
-    info = billing_v1.ProjectBillingInfo(name=name, billing_account_name=billing_account_name)
+    # Only set billing_account_name in the body; including name in the body can cause 400 InvalidArgument.
+    info = billing_v1.ProjectBillingInfo(billing_account_name=billing_account_name)
     client = billing_v1.CloudBillingClient()
     client.update_project_billing_info(name=name, project_billing_info=info)
     logger.info("Linked project %s to billing account %s", project_id, billing_account_name)
