@@ -7,44 +7,17 @@ import { useState } from "react";
 const plans = [
   {
     name: "Starter",
-    price: { monthly: 9, yearly: 7 },
+    price: { monthly: 39.99, yearly: 31.99 },
     desc: "Perfect for personal use",
-    features: ["1 AI agent", "1 messaging channel", "99.9% uptime SLA", "Auto-updates", "Email support"],
+    features: [
+      "1 AI agent",
+      "1 messaging channel",
+      "99.9% uptime SLA",
+      "Auto-updates",
+      "Email support",
+    ],
     cta: "Get Started",
-    highlight: false,
-  },
-  {
-    name: "Pro",
-    price: { monthly: 19, yearly: 15 },
-    desc: "For power users",
-    features: [
-      "5 AI agents",
-      "All messaging channels",
-      "99.99% uptime SLA",
-      "Auto-updates",
-      "Priority support",
-      "Custom commands",
-      "Analytics dashboard",
-    ],
-    cta: "Start Free Trial",
     highlight: true,
-  },
-  {
-    name: "Team",
-    price: { monthly: 49, yearly: 39 },
-    desc: "For teams & businesses",
-    features: [
-      "Unlimited AI agents",
-      "All messaging channels",
-      "99.99% uptime SLA",
-      "Auto-updates",
-      "Dedicated support",
-      "Custom integrations",
-      "Team management",
-      "SSO & audit logs",
-    ],
-    cta: "Contact Sales",
-    highlight: false,
   },
 ];
 
@@ -84,7 +57,7 @@ export default function PricingSection() {
           </div>
         </div>
 
-        <div className="grid gap-6 md:grid-cols-3">
+        <div className="mx-auto grid max-w-md grid-cols-1 gap-6">
           {plans.map((plan, i) => (
             <div
               key={i}
@@ -112,7 +85,7 @@ export default function PricingSection() {
                 <p className="mb-4 text-sm text-muted-foreground">{plan.desc}</p>
                 <div className="flex items-end gap-1">
                   <span className="text-4xl font-bold font-mono text-foreground">
-                    ${yearly ? plan.price.yearly : plan.price.monthly}
+                    ${(yearly ? plan.price.yearly : plan.price.monthly).toFixed(2)}
                   </span>
                   <span className="mb-1 text-sm text-muted-foreground">/mo</span>
                 </div>
