@@ -32,7 +32,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <ClawHostLogo size="sm" />
           </Link>
           <Link href="/dashboard" className={pathname === "/dashboard" ? "text-emerald-500" : "text-neutral-400 hover:text-[var(--foreground)]"}>Dashboard</Link>
-          <Link href="/dashboard/instances" className={pathname === "/dashboard/instances" ? "text-emerald-500" : "text-neutral-400 hover:text-[var(--foreground)]"}>Intance</Link>
+          <Link href="/dashboard/instances" className={pathname === "/dashboard/instances" ? "text-emerald-500" : "text-neutral-400 hover:text-[var(--foreground)]"}>Instances</Link>
           <Link href="/dashboard/subscribe" className={pathname === "/dashboard/subscribe" ? "text-emerald-500" : "text-neutral-400 hover:text-[var(--foreground)]"}>Subscribe</Link>
           <Link href="/dashboard/account" className={pathname === "/dashboard/account" ? "text-emerald-500" : "text-neutral-400 hover:text-[var(--foreground)]"}>Account</Link>
         </nav>

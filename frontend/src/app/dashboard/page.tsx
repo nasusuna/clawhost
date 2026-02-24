@@ -75,12 +75,12 @@ export default function DashboardPage() {
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Intance</CardTitle>
+            <CardTitle>Instances</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-neutral-400 mb-4">View and manage your OpenClaw instances.</p>
             <Button asChild>
-              <Link href="/dashboard/instances">View intance</Link>
+              <Link href="/dashboard/instances">View instances</Link>
             </Button>
           </CardContent>
         </Card>

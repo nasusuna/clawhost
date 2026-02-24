@@ -57,7 +57,7 @@ export default function InstancesPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl font-semibold">Intance</h1>
+      <h1 className="text-2xl font-semibold">Instances</h1>
       {message && (
         <p className={message.startsWith("Job") ? "text-emerald-500 text-sm" : "text-red-500 text-sm"}>
           {message}
