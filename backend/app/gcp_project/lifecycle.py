@@ -88,10 +88,10 @@ except ImportError:
 
 def link_billing_account(project_id: str, billing_account_name: str) -> None:
     """Link the project to the billing account. Sync. Prefer REST API for clearer errors."""
-    name = f"projects/{project_id}/billingInfo"
     body = {"billingAccountName": billing_account_name}
 
     # Try REST API first (often gives clearer 400 error messages than gRPC).
+    # REST name must be projects/{projectId} (no /billingInfo); pattern ^projects/[^/]+$
     try:
         from google.auth import default
         from googleapiclient import discovery
@@ -102,6 +102,7 @@ def link_billing_account(project_id: str, billing_account_name: str) -> None:
         try:
             credentials, _ = default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
             service = discovery.build("cloudbilling", "v1", credentials=credentials, cache_discovery=False)
+            name = f"projects/{project_id}"  # REST expects projects/{id} only
             logger.info("Linking project %s to billing account %s", project_id, billing_account_name)
             service.projects().updateBillingInfo(name=name, body=body).execute()
             logger.info("Linked project %s to billing account %s", project_id, billing_account_name)
