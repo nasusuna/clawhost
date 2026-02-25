@@ -114,6 +114,10 @@ def _telegram_config_fragment(bot_token: str) -> dict[str, Any]:
     }
 
 
+# SSH username on provisioned VPS (Contabo/Ubuntu default is admin, not root)
+SSH_USERNAME = "admin"
+
+
 def _apply_telegram_config_via_ssh_sync(
     host: str,
     root_password: str,
@@ -121,7 +125,7 @@ def _apply_telegram_config_via_ssh_sync(
 ) -> None:
     """
     Sync SSH: read /root/openclaw.json on the VPS, merge telegram fragment, write back, restart openclaw container.
-    Raises on SSH or command failure.
+    Uses admin + sudo (Ubuntu/Contabo default). Raises on SSH or command failure.
     """
     import paramiko
 
@@ -130,7 +134,7 @@ def _apply_telegram_config_via_ssh_sync(
     try:
         client.connect(
             host,
-            username="root",
+            username=SSH_USERNAME,
             password=root_password,
             timeout=SSH_CONNECT_TIMEOUT,
             banner_timeout=SSH_CONNECT_TIMEOUT,
@@ -140,9 +144,9 @@ def _apply_telegram_config_via_ssh_sync(
         raise
 
     try:
-        # Read current config
+        # Read current config (sudo: admin can read /root/ with sudo)
         stdin, stdout, stderr = client.exec_command(
-            "cat /root/openclaw.json",
+            "sudo cat /root/openclaw.json",
             timeout=SSH_COMMAND_TIMEOUT,
         )
         err = stderr.read().decode().strip()
@@ -161,16 +165,16 @@ def _apply_telegram_config_via_ssh_sync(
 
         new_json = json.dumps(config, separators=(",", ":"))
         b64 = base64.b64encode(new_json.encode()).decode()
-        cmd = f"echo '{b64}' | base64 -d > /root/openclaw.json"
+        cmd = f"echo '{b64}' | base64 -d | sudo tee /root/openclaw.json > /dev/null"
         stdin, stdout, stderr = client.exec_command(cmd, timeout=SSH_COMMAND_TIMEOUT)
         exit_status = stdout.channel.recv_exit_status()
         if exit_status != 0:
             err = (stderr.read().decode() or "").strip()
             raise RuntimeError(f"Failed to write openclaw.json: exit {exit_status} {err}")
 
-        # Restart OpenClaw container
+        # Restart OpenClaw container (sudo: admin may need sudo for docker)
         stdin, stdout, stderr = client.exec_command(
-            "docker restart openclaw",
+            "sudo docker restart openclaw",
             timeout=SSH_COMMAND_TIMEOUT,
         )
         exit_status = stdout.channel.recv_exit_status()
