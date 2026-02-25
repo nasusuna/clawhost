@@ -122,33 +122,87 @@ export default function SubscribePage() {
             </Link>{" "}
             page in the dashboard.
           </p>
+
           <Card className="max-w-xl">
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Send className="h-5 w-5" />
-                Telegram bot token
+                How to get your bot token?
               </CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Get a token from @BotFather in Telegram (<code className="rounded bg-muted px-1">/newbot</code>), then paste it below.
-              </p>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <input
-                id="onboarding-telegram-token"
-                type="text"
-                value={telegramToken}
-                onChange={(e) => setTelegramToken(e.target.value)}
-                placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
-                className="w-full rounded-lg border border-border bg-background px-4 py-3 font-mono text-sm text-foreground placeholder:text-muted-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring"
-                aria-label="Telegram bot token"
-              />
-              {telegramError && (
-                <p className="text-sm text-red-400">{telegramError}</p>
-              )}
-              {telegramSuccess && (
-                <p className="text-sm text-emerald-500">Token saved. You can continue to payment.</p>
-              )}
-              <div className="flex flex-wrap gap-3">
+            <CardContent className="space-y-5">
+              <ol className="space-y-4 text-secondary-foreground list-none pl-0">
+                <li className="flex gap-3">
+                  <span className="mt-0.5 font-mono text-sm text-muted-foreground shrink-0">1.</span>
+                  <span>
+                    Open Telegram and go to{" "}
+                    <a
+                      href="https://t.me/BotFather"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-primary hover:underline"
+                    >
+                      @BotFather
+                    </a>
+                    .
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="mt-0.5 font-mono text-sm text-muted-foreground shrink-0">2.</span>
+                  <span>
+                    Start a chat and type{" "}
+                    <code className="rounded bg-muted px-2 py-0.5 text-sm text-foreground">/newbot</code>.
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="mt-0.5 font-mono text-sm text-muted-foreground shrink-0">3.</span>
+                  <span>Follow the prompts to name your bot and choose a username.</span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="mt-0.5 font-mono text-sm text-muted-foreground shrink-0">4.</span>
+                  <span>
+                    BotFather will send you a message with your bot token. Copy the entire token
+                    (it looks like a long string of numbers and letters).
+                  </span>
+                </li>
+                <li className="flex gap-3">
+                  <span className="mt-0.5 font-mono text-sm text-muted-foreground shrink-0">5.</span>
+                  <span>Paste the token in the field below and click Save token.</span>
+                </li>
+              </ol>
+
+              <div className="space-y-2 pt-2">
+                <label
+                  htmlFor="onboarding-telegram-token"
+                  className="text-sm font-semibold text-foreground"
+                >
+                  Enter bot token
+                </label>
+                <input
+                  id="onboarding-telegram-token"
+                  type="text"
+                  value={telegramToken}
+                  onChange={(e) => {
+                    setTelegramToken(e.target.value);
+                    setTelegramError(null);
+                  }}
+                  placeholder="1234567890:ABCdefGHIjklMNOpqrsTUVwxyz"
+                  className="w-full rounded-lg border border-border bg-background px-4 py-3 font-mono text-sm text-foreground placeholder:text-muted-foreground focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring"
+                  aria-label="Telegram bot token"
+                  aria-invalid={!!telegramError}
+                  aria-describedby={telegramError ? "onboarding-telegram-error" : undefined}
+                />
+                {telegramError && (
+                  <p id="onboarding-telegram-error" className="text-sm text-red-400" role="alert">
+                    {telegramError}
+                  </p>
+                )}
+                {telegramSuccess && (
+                  <p className="text-sm text-emerald-500">Token saved. You can continue to payment.</p>
+                )}
+              </div>
+
+              <div className="flex flex-wrap gap-3 pt-2">
                 <Button
                   onClick={handleSaveTelegram}
                   disabled={!telegramToken.trim() || telegramSaving}
@@ -156,8 +210,22 @@ export default function SubscribePage() {
                 >
                   {telegramSaving ? "Saving…" : "Save token"}
                 </Button>
-                <Button onClick={handleContinueToPayment} className="gap-2">
+                <Button
+                  onClick={handleContinueToPayment}
+                  disabled={!telegramSuccess}
+                  className="gap-2"
+                  aria-label="Continue to payment (enable after saving token)"
+                >
                   Continue to payment
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  onClick={handleContinueToPayment}
+                  variant="outline"
+                  className="gap-2"
+                  aria-label="Skip Telegram and continue to payment"
+                >
+                  Skip & Continue to Payment
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </div>
