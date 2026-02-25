@@ -1,6 +1,6 @@
-# ClawHost — Production Deployment Guide
+# ClawBolt — Production Deployment Guide
 
-This guide covers steps to run ClawHost in production.
+This guide covers steps to run ClawBolt in production.
 
 **For a step-by-step Railway + Vercel deployment, see [RAILWAY_VERCEL_SETUP.md](./RAILWAY_VERCEL_SETUP.md).**
 
@@ -202,7 +202,7 @@ Ensure `NEXT_PUBLIC_API_URL` points to your production backend (e.g. `https://ap
 
 ## 10. DNS & SSL
 
-**ClawHost dashboard/app:**
+**ClawBolt dashboard/app:**
 - Point your domain (e.g. `app.clawhost.com`) to your frontend host.
 - Point API domain (e.g. `api.clawhost.com`) to backend.
 - Use Let's Encrypt (Certbot) or provider-managed SSL.
@@ -277,7 +277,7 @@ Contabo VPS
 
 - **Nginx** on the host: listens on 80/443, terminates SSL (Certbot), proxies `/` to OpenClaw. Add the instance domain (or IP) to `server_name` and set `trustedProxies` in OpenClaw so the gateway treats the connection as local.
 - **Docker network:** Create a shared bridge network (e.g. `openclaw-net`). Run Ollama and OpenClaw on that network so OpenClaw reaches Ollama at `http://ollama:11434` (container name or service name). No need for host network unless you prefer it.
-- **Postgres** in Docker is optional for the instance itself; the ClawHost platform usually uses a separate managed Postgres for the dashboard/API.
+- **Postgres** in Docker is optional for the instance itself; the ClawBolt platform usually uses a separate managed Postgres for the dashboard/API.
 
 Current install script uses **host network** for OpenClaw and **Ollama on the host** (systemd) so OpenClaw can use `127.0.0.1:11434`. The layout above is the recommended **all-Docker** variant: same Docker network for OpenClaw and Ollama, Nginx on host for SSL.
 
@@ -298,7 +298,7 @@ Run the install script **on the VPS** (via SSH):
 1. Copy the script to the server (or paste its contents into a file):
    - `backend/scripts/install-ollama-openclaw-on-server.sh`
 2. Ensure LF line endings: `sed -i 's/\r$//' ./install-ollama-openclaw-on-server.sh`
-3. Run with your instance domain and gateway token (from the ClawHost dashboard):
+3. Run with your instance domain and gateway token (from the ClawBolt dashboard):
 
    ```bash
    chmod +x install-ollama-openclaw-on-server.sh
@@ -360,7 +360,7 @@ sudo docker run -d --restart always \
   fourplayers/openclaw:latest
 ```
 
-Replace `YOUR_GATEWAY_TOKEN` with the token from the ClawHost dashboard.
+Replace `YOUR_GATEWAY_TOKEN` with the token from the ClawBolt dashboard.
 
 **3. Point OpenClaw config at Ollama by hostname**
 
@@ -500,7 +500,7 @@ The red "fetch failed" in the dashboard usually means the browser cannot complet
    - **Check if the token is set on the container:**  
      `sudo docker exec openclaw printenv OPENCLAW_GATEWAY_TOKEN`  
      If this prints nothing, the variable is not set.
-   - **Where the token comes from:** ClawHost dashboard → your instance → copy the gateway token (or use the value you passed when running the install script).
+   - **Where the token comes from:** ClawBolt dashboard → your instance → copy the gateway token (or use the value you passed when running the install script).
    - **Fix:** Recreate the container with the correct token. Example (replace with your token and domain):
      ```bash
      sudo docker stop openclaw && sudo docker rm openclaw
@@ -674,7 +674,7 @@ If per-subscription project creation is disabled or fails, the backend falls bac
 - **Behavior:** A cron job in the ARQ worker runs every 6 hours (00:00, 06:00, 12:00, 18:00 UTC). If the number of available (unassigned) keys is below `GEMINI_KEY_POOL_MIN_AVAILABLE`, it creates keys via the GCP API Keys API and stores them in the DB until the threshold is met (up to 5 keys per run to respect rate limits). No manual script runs needed.
 - **Deploy:** Ensure the **ARQ worker** is running (e.g. `arq app.queue.worker.WorkerSettings`); it must have the same env as above so it can call GCP and the database.
 
-Recommended for ClawHost: **user-supplied key** (optional field in dashboard before or after checkout) and/or **one shared `GEMINI_API_KEY`** in backend env for trials.
+Recommended for ClawBolt: **user-supplied key** (optional field in dashboard before or after checkout) and/or **one shared `GEMINI_API_KEY`** in backend env for trials.
 
 ### Backend env
 
@@ -695,7 +695,7 @@ GEMINI_API_KEY=your-key-from-google-ai-studio
 
 ## 16. Telegram channel on instances
 
-OpenClaw can receive and reply to messages via a **Telegram bot** (DMs and optional groups). You provide the bot token; ClawHost does not store it. Configure it in OpenClaw on your instance.
+OpenClaw can receive and reply to messages via a **Telegram bot** (DMs and optional groups). You provide the bot token; ClawBolt does not store it. Configure it in OpenClaw on your instance.
 
 ### 1. Create the bot and get the token
 

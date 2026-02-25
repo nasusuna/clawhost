@@ -1,4 +1,4 @@
-# ClawHost — Design Specification
+# ClawBolt — Design Specification
 
 **Product:** Managed OpenClaw Hosting (One-Click Deploy)  
 **Reference products:** [easyclaw.in](https://easyclaw.in), [breezeclaw.com](https://breezeclaw.com)  
@@ -9,7 +9,7 @@
 
 ## 1. Product Overview
 
-ClawHost provides **managed OpenClaw instances** on dedicated VPS. Each customer gets one Contabo (or alternative) VPS, one Dockerized OpenClaw container, one subdomain, and one isolated environment. Billing and lifecycle are driven by Stripe subscriptions; provisioning and teardown are automated via provider API + queue-based jobs.
+ClawBolt provides **managed OpenClaw instances** on dedicated VPS. Each customer gets one Contabo (or alternative) VPS, one Dockerized OpenClaw container, one subdomain, and one isolated environment. Billing and lifecycle are driven by Stripe subscriptions; provisioning and teardown are automated via provider API + queue-based jobs.
 
 **Core value:** Stripe → Backend → Provider API → Queue → SSH/Cloud-Init → Docker OpenClaw → Customer.
 

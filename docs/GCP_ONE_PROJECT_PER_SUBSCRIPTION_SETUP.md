@@ -1,8 +1,8 @@
 # One GCP project per subscription — detailed setup
 
-This guide walks you through enabling **one GCP project per subscription**: on each successful Stripe checkout, ClawHost creates a new GCP project, enables the Generative Language API, links billing, creates a $15 budget, and creates a Gemini API key in that project. Use this for a **$15/month cap per user** via GCP Billing.
+This guide walks you through enabling **one GCP project per subscription**: on each successful Stripe checkout, ClawBolt creates a new GCP project, enables the Generative Language API, links billing, creates a $15 budget, and creates a Gemini API key in that project. Use this for a **$15/month cap per user** via GCP Billing.
 
-**Prerequisites:** You already have ClawHost deployed (Backend + Worker on Railway, Stripe, Contabo, etc.). See [RAILWAY_VERCEL_SETUP.md](./RAILWAY_VERCEL_SETUP.md) and [PRODUCTION.md](./PRODUCTION.md).
+**Prerequisites:** You already have ClawBolt deployed (Backend + Worker on Railway, Stripe, Contabo, etc.). See [RAILWAY_VERCEL_SETUP.md](./RAILWAY_VERCEL_SETUP.md) and [PRODUCTION.md](./PRODUCTION.md).
 
 ---
 
@@ -50,15 +50,15 @@ Write it down: **`GCP_ORGANIZATION_ID`** = `________________`.
 ### 2.2 Get your Billing Account ID
 
 1. In GCP Console go to **Billing** → [Billing](https://console.cloud.google.com/billing).
-2. Select the billing account you will use for ClawHost subscriber projects.
+2. Select the billing account you will use for ClawBolt subscriber projects.
 3. Open **Account management** (or the account name). The **Billing account ID** is in the URL or on the page (e.g. `01ABC2D-3EF4G5-6789HI`).  
    - You can use either the ID alone or the full resource name: `billingAccounts/01ABC2D-3EF4G5-6789HI`.
 
 Write it down: **`GCP_BILLING_ACCOUNT_ID`** = `________________`.
 
-### 2.3 Create a service account for ClawHost
+### 2.3 Create a service account for ClawBolt
 
-1. In GCP Console, select a **project** where you will manage this service account (can be your main ClawHost project or a dedicated “admin” project).
+1. In GCP Console, select a **project** where you will manage this service account (can be your main ClawBolt project or a dedicated “admin” project).
 2. Go to **IAM & Admin** → [Service Accounts](https://console.cloud.google.com/iam-admin/serviceaccounts).
 3. Click **+ Create Service Account**.
 4. **Service account name:** e.g. `clawhost-project-creator`.
@@ -126,11 +126,11 @@ When the service account **creates** a new project via the API, it must be able 
 
 1. Open the official doc: [Creating and managing projects](https://cloud.google.com/resource-manager/docs/creating-managing-projects).
 2. On that page, find the section that describes **who gets access** when a project is created. Google states that the **identity that creates the project** is made **Owner** of that project.
-3. So: your ClawHost service account (with **Project Creator** on the org from step 2.4) will automatically get **Owner** on each new project it creates and can enable APIs and create API keys there.
+3. So: your ClawBolt service account (with **Project Creator** on the org from step 2.4) will automatically get **Owner** on each new project it creates and can enable APIs and create API keys there.
 
 **B. Navigation steps to verify in the console (after a project is created)**
 
-Do this after you have at least one project created by the ClawHost service account (e.g. after a test subscription or a one-off create).
+Do this after you have at least one project created by the ClawBolt service account (e.g. after a test subscription or a one-off create).
 
 1. **Open Resource Manager**
    - In the left sidebar: **IAM & Admin** → **Manage resources**  
@@ -141,7 +141,7 @@ Do this after you have at least one project created by the ClawHost service acco
    - Select your **Organization** (e.g. `receiptrecon.com`) so you see all projects and folders under it.
 
 3. **Find the new project**
-   - In the list, find the project that was just created (e.g. name like `ClawHost sub xxxxxxxx` or project ID like `ch-<hex>`).
+   - In the list, find the project that was just created (e.g. name like `ClawBolt sub xxxxxxxx` or project ID like `ch-<hex>`).
    - Click the **project name** (or the row) to open that project.
 
 4. **Open IAM for that project**
@@ -149,7 +149,7 @@ Do this after you have at least one project created by the ClawHost service acco
    - Or: [console.cloud.google.com/iam-admin/iam](https://console.cloud.google.com/iam-admin/iam) and ensure the **project** dropdown at the top shows the new project (not the org).
 
 5. **Confirm the service account has Owner**
-   - In the **IAM** table, look for the principal that is your ClawHost service account (e.g. `clawhost-project-creator@boltreceipt.iam.gserviceaccount.com`).
+   - In the **IAM** table, look for the principal that is your ClawBolt service account (e.g. `clawhost-project-creator@boltreceipt.iam.gserviceaccount.com`).
    - Check the **Role(s)** column for that principal. It should include **Owner**.
    - If you see **Owner** (or **Owner** plus other roles), the “project creator = Owner” behavior is in effect → no further steps needed for 2.6.
 
@@ -164,8 +164,8 @@ If your console lets you grant these roles at the **organization** level, the se
 1. **Open org IAM** (same as 2.4)
    - **IAM & Admin** → **IAM** → switch the resource picker to **Organization** → select your org (e.g. `receiptrecon.com`).
 
-2. **Edit the existing principal** (your ClawHost service account)
-   - In the list, find the principal that is your ClawHost service account (e.g. `clawhost-project-creator@...`).
+2. **Edit the existing principal** (your ClawBolt service account)
+   - In the list, find the principal that is your ClawBolt service account (e.g. `clawhost-project-creator@...`).
    - Click the **pencil (Edit)** icon on that row.
 
 3. **Add two more roles**
@@ -197,11 +197,11 @@ So minimal setup:
 
 #### 2.6.3 Option B — Use a folder and grant Owner on the folder
 
-If the service account does **not** get Owner on newly created projects and org-level API Keys Admin / Service Usage Admin are not available, create a **folder**, grant the service account **Owner** on that folder, and create all ClawHost subscriber projects **under that folder**. This requires a **code change** so ClawHost uses the folder as parent instead of the organization.
+If the service account does **not** get Owner on newly created projects and org-level API Keys Admin / Service Usage Admin are not available, create a **folder**, grant the service account **Owner** on that folder, and create all ClawBolt subscriber projects **under that folder**. This requires a **code change** so ClawBolt uses the folder as parent instead of the organization.
 
-1. **Create a folder under the org:** IAM & Admin → Manage resources → set picker to Organization → Create Folder (e.g. `ClawHost Subscriber Projects`).
+1. **Create a folder under the org:** IAM & Admin → Manage resources → set picker to Organization → Create Folder (e.g. `ClawBolt Subscriber Projects`).
 2. **Grant the SA Owner on the folder:** Open the folder → Permissions / IAM → Grant Access → principal = SA email, Role = Owner → Save.
-3. **Use folder as parent in ClawHost:** Env var `GCP_PARENT_FOLDER_ID` = folder ID; backend would use `folders/<id>` as parent (code change required).
+3. **Use folder as parent in ClawBolt:** Env var `GCP_PARENT_FOLDER_ID` = folder ID; backend would use `folders/<id>` as parent (code change required).
 
 #### 2.6.4 Summary
 
@@ -229,7 +229,7 @@ Enable them in the **project** that holds your service account (or at org level 
 ### 2.8 Create and download the service account key
 
 1. Go to **IAM & Admin** → **Service Accounts**.
-2. Click the ClawHost service account (e.g. `clawhost-project-creator@...`).
+2. Click the ClawBolt service account (e.g. `clawhost-project-creator@...`).
 3. Open **Keys** → **Add Key** → **Create new key** → **JSON**.
 4. Download the JSON file. Keep it **secret**; never commit it to git.
 5. You will put the **contents** of this JSON into Railway as the value of `GOOGLE_APPLICATION_CREDENTIALS` (see Step 4). Alternatively, some platforms let you mount a file; then use the path to that file.
@@ -313,7 +313,7 @@ If per-subscription project creation **fails** (e.g. quota, permissions), the ba
 
 So you can set:
 
-- `GCP_PROJECT_ID` = the project where your ClawHost service account lives (or any project where the SA has API Keys Admin). Used only when the per-subscription project flow is not used or fails.
+- `GCP_PROJECT_ID` = the project where your ClawBolt service account lives (or any project where the SA has API Keys Admin). Used only when the per-subscription project flow is not used or fails.
 
 ---
 

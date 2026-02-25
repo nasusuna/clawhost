@@ -4,7 +4,7 @@ import { AuthProvider } from "@/components/AuthProvider";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 export const metadata: Metadata = {
-  title: "ClawHost — Managed OpenClaw",
+  title: "ClawBolt — Managed OpenClaw",
   description: "One-click OpenClaw hosting. Deploy your AI assistant in under 1 minute.",
 };
 

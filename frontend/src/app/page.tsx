@@ -84,6 +84,7 @@ export default function HomePage() {
                     href="/register"
                     className="rounded-xl px-6 py-3 font-semibold text-primary-foreground transition-all duration-200 hover:scale-[1.02] hover:opacity-90 active:scale-[0.98] glow-cyan"
                     style={{ background: "var(--gradient-primary)" }}
+                    aria-label="Deploy OpenClaw Now — go to register page"
                   >
                     🚀 Deploy OpenClaw Now
                   </Link>
@@ -150,7 +151,7 @@ export default function HomePage() {
                 Ready to deploy?
               </h2>
               <p className="mb-8 text-lg text-muted-foreground">
-                Join thousands of users running their AI agents 24/7 with ClawHost.
+                Join thousands of users running their AI agents 24/7 with ClawBolt.
               </p>
               {user ? (
                 <Link

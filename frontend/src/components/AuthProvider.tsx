@@ -27,17 +27,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const login = useCallback((t: string) => {
     setToken(t);
-    if (typeof window !== "undefined") localStorage.setItem("clawhost_token", t);
+    if (typeof window !== "undefined") localStorage.setItem("clawbolt_token", t);
   }, []);
 
   const logout = useCallback(() => {
     setToken(null);
     setUser(null);
-    if (typeof window !== "undefined") localStorage.removeItem("clawhost_token");
+    if (typeof window !== "undefined") localStorage.removeItem("clawbolt_token");
   }, []);
 
   useEffect(() => {
-    const t = typeof window !== "undefined" ? localStorage.getItem("clawhost_token") : null;
+    const t = typeof window !== "undefined" ? localStorage.getItem("clawbolt_token") : null;
     if (t) setToken(t);
   }, []);
 

@@ -1,4 +1,4 @@
-# ClawHost
+# ClawBolt
 
 Managed OpenClaw Hosting — one-click deploy, dedicated VPS, Stripe billing.
 

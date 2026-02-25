@@ -17,7 +17,7 @@ export default function Navbar() {
         </div>
         <span className="text-lg font-bold tracking-tight">
           <span className="text-foreground">Claw</span>
-          <span className="text-gradient">Host</span>
+          <span className="text-gradient">Bolt</span>
         </span>
       </div>
 

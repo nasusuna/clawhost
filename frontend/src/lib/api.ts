@@ -3,11 +3,11 @@ import { API_BASE } from "./utils";
 type Method = "GET" | "POST" | "PUT" | "DELETE";
 
 const getToken = (): string | null =>
-  typeof window !== "undefined" ? localStorage.getItem("clawhost_token") : null;
+  typeof window !== "undefined" ? localStorage.getItem("clawbolt_token") : null;
 
 const handleUnauthorized = (): void => {
   if (typeof window === "undefined") return;
-  localStorage.removeItem("clawhost_token");
+  localStorage.removeItem("clawbolt_token");
   window.location.href = "/login";
 };
 

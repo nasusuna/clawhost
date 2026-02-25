@@ -28,7 +28,7 @@ export default function ComparisonSection() {
           <h2 className="mb-4 text-4xl font-bold text-foreground md:text-5xl">
             Skip the complexity
           </h2>
-          <p className="text-lg text-muted-foreground">Traditional deployment vs ClawHost</p>
+          <p className="text-lg text-muted-foreground">Traditional deployment vs ClawBolt</p>
         </div>
 
         <div className="grid gap-6 md:grid-cols-2">
@@ -64,7 +64,7 @@ export default function ComparisonSection() {
             </div>
           </div>
 
-          {/* ClawHost */}
+          {/* ClawBolt */}
           <div
             className="relative overflow-hidden rounded-2xl border p-6"
             style={{
@@ -77,7 +77,7 @@ export default function ComparisonSection() {
               <div className="mb-5 flex items-center justify-between">
                 <div>
                   <div className="mb-1 text-xs font-mono uppercase tracking-wider text-brand-cyan/80">
-                    ClawHost Deployment
+                    ClawBolt Deployment
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4 text-brand-cyan" />

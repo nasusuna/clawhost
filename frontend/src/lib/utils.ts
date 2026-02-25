@@ -13,7 +13,7 @@ export const assertProductionApiUrl = (): void => {
   const u = rawApiUrl.toLowerCase();
   if (u.includes("localhost") || u.startsWith("http://127.0.0.1")) {
     console.warn(
-      "[ClawHost] NEXT_PUBLIC_API_URL looks like localhost. Set it to your production API URL (e.g. https://api.clawhost.com) for production."
+      "[ClawBolt] NEXT_PUBLIC_API_URL looks like localhost. Set it to your production API URL (e.g. https://api.clawbolt.online) for production."
     );
   }
 };

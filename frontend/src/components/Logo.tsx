@@ -3,10 +3,10 @@
 import { useId } from "react";
 
 /**
- * ClawHost logo — claw mark + wordmark, inspired by OpenClaw (openclaw.ai).
- * Minimal lobster/crab claw suggesting grip + hosting.
+ * ClawBolt logo — claw mark + wordmark, inspired by OpenClaw (openclaw.ai).
+ * Minimal lobster/crab claw suggesting grip + speed.
  */
-export const ClawHostLogo = ({
+export const ClawBoltLogo = ({
   size = "md",
   showWordmark = true,
   className = "",
@@ -59,7 +59,7 @@ export const ClawHostLogo = ({
         <span className={`font-semibold tracking-tight ${s.text}`}>
           <span className="text-white">Claw</span>
           <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
-            Host
+            Bolt
           </span>
         </span>
       )}

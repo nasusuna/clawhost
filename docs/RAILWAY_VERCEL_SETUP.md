@@ -1,6 +1,6 @@
-# ClawHost — Railway + Vercel Setup Guide
+# ClawBolt — Railway + Vercel Setup Guide
 
-Step-by-step deployment of ClawHost using **Railway** (backend, worker, PostgreSQL, Redis) and **Vercel** (frontend).
+Step-by-step deployment of ClawBolt using **Railway** (backend, worker, PostgreSQL, Redis) and **Vercel** (frontend).
 
 **Order of operations:** Create Railway project → Backend + DB + Redis → get Backend URL → run migrations → add Worker → Stripe webhook → Vercel frontend → set `CORS_ALLOWED_ORIGINS` and `NEXT_PUBLIC_API_URL` → verify.
 
@@ -8,7 +8,7 @@ Step-by-step deployment of ClawHost using **Railway** (backend, worker, PostgreS
 
 ## Prerequisites
 
-- [ ] ClawHost repo pushed to **GitHub** (or GitLab/Bitbucket)
+- [ ] ClawBolt repo pushed to **GitHub** (or GitLab/Bitbucket)
 - [ ] **Stripe** account (live mode keys when ready)
 - [ ] **Contabo** account (API credentials)
 - [ ] **Railway** account — [railway.app](https://railway.app)
@@ -49,7 +49,7 @@ Step-by-step deployment of ClawHost using **Railway** (backend, worker, PostgreS
 ### Step 2.1: Deploy from GitHub
 
 1. Click **"+ New"** → **"GitHub Repo"**.
-2. Select your ClawHost repository.
+2. Select your ClawBolt repository.
 3. Railway will create a new service and attempt a build.
 
 ### Step 2.2: Configure the Backend service
@@ -130,7 +130,7 @@ If you need to run migrations **before** the first deploy (e.g. you created the 
 ### Step 3.1: Add Worker from same repo
 
 1. Click **"+ New"** → **"GitHub Repo"**.
-2. Select the **same** ClawHost repository.
+2. Select the **same** ClawBolt repository.
 3. A second service is created.
 
 ### Step 3.2: Configure the Worker service
@@ -212,7 +212,7 @@ Create a webhook in Stripe so your backend is notified when a customer completes
 
 1. Go to [vercel.com](https://vercel.com) and sign in (GitHub recommended).
 2. Click **"Add New..."** → **"Project"**.
-3. Import your ClawHost repository.
+3. Import your ClawBolt repository.
 4. **Framework Preset:** Next.js (auto-detected).
 
 ### Step 5.2: Configure build

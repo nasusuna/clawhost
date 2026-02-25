@@ -14,7 +14,7 @@ export default function Footer() {
                 <Zap className="h-3.5 w-3.5 text-primary-foreground" />
               </div>
               <span className="font-bold text-foreground">
-                Claw<span className="text-gradient">Host</span>
+                Claw<span className="text-gradient">Bolt</span>
               </span>
             </div>
             <p className="text-sm leading-relaxed text-muted-foreground">
@@ -93,7 +93,7 @@ export default function Footer() {
 
         <div className="flex flex-col items-center justify-between border-t border-border/40 pt-6 sm:flex-row">
           <p className="text-sm text-muted-foreground">
-            © 2025 ClawHost. All rights reserved.
+            © 2025 ClawBolt. All rights reserved.
           </p>
           <div className="mt-4 flex items-center gap-3 sm:mt-0">
             {[Mail, Twitter, Github].map((Icon, i) => (

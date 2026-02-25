@@ -109,7 +109,7 @@ export default function PricingSection() {
               </ul>
 
               <Link
-                href={plan.cta === "Contact Sales" ? "mailto:sales@clawhost.com" : "/dashboard/subscribe"}
+                href={plan.cta === "Contact Sales" ? "mailto:sales@clawbolt.online" : "/dashboard/subscribe"}
                 className={`flex w-full items-center justify-center rounded-xl py-3 text-sm font-semibold transition-all duration-200 hover:scale-[1.02] hover:opacity-90 active:scale-[0.98] ${
                   plan.highlight
                     ? "text-primary-foreground"

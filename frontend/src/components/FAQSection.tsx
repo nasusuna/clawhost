@@ -5,8 +5,8 @@ import { ChevronDown } from "lucide-react";
 
 const faqs = [
   {
-    q: "What is ClawHost?",
-    a: "ClawHost is a managed deployment platform for OpenClaw AI agents. Dedicated VPS per customer — no servers to manage, no SSH, no configuration. Your AI agent goes live in under 60 seconds.",
+    q: "What is ClawBolt?",
+    a: "ClawBolt is a managed deployment platform for OpenClaw AI agents. Dedicated VPS per customer — no servers to manage, no SSH, no configuration. Your AI agent goes live in under 60 seconds.",
   },
   {
     q: "Which AI models are supported?",
