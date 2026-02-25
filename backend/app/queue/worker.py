@@ -6,7 +6,7 @@ from arq.connections import RedisSettings
 from arq.cron import cron
 
 from app.config import settings
-from app.queue.tasks import provision_instance, replenish_gemini_key_pool
+from app.queue.tasks import apply_telegram_to_instance, provision_instance, replenish_gemini_key_pool
 
 
 async def enqueue_provision_job(user_id: uuid.UUID, subscription_id: uuid.UUID, plan_type: str) -> str:
@@ -18,6 +18,19 @@ async def enqueue_provision_job(user_id: uuid.UUID, subscription_id: uuid.UUID, 
         str(user_id),
         str(subscription_id),
         plan_type,
+    )
+    await pool.close()
+    return job.job_id if job else ""
+
+
+async def enqueue_apply_telegram_to_instance(instance_id: uuid.UUID, user_id: uuid.UUID) -> str:
+    """Enqueue job to apply Telegram config on an existing running instance. Returns ARQ job_id."""
+    redis_settings = RedisSettings.from_dsn(settings.redis_url)
+    pool = await create_pool(redis_settings)
+    job = await pool.enqueue_job(
+        "apply_telegram_to_instance",
+        str(instance_id),
+        str(user_id),
     )
     await pool.close()
     return job.job_id if job else ""
@@ -35,7 +48,7 @@ _replenish_cron = cron(
 
 # Worker entrypoint: run with: arq app.queue.worker.WorkerSettings
 class WorkerSettings:
-    functions = [provision_instance, replenish_gemini_key_pool]
+    functions = [provision_instance, apply_telegram_to_instance, replenish_gemini_key_pool]
     redis_settings = RedisSettings.from_dsn(settings.redis_url)
     max_jobs = 5
     job_timeout = 3600

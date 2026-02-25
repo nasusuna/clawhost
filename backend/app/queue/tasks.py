@@ -22,6 +22,10 @@ from app.provider.contabo import ContaboClient
 
 logger = logging.getLogger("app.queue.tasks")
 
+# SSH timeout for apply_telegram_to_instance
+SSH_CONNECT_TIMEOUT = 25
+SSH_COMMAND_TIMEOUT = 30
+
 
 async def _get_provider_client() -> ContaboClient | None:
     if not all([
@@ -35,8 +39,12 @@ async def _get_provider_client() -> ContaboClient | None:
     return ContaboClient(settings.contabo_api_url)
 
 
-def _openclaw_gemini_config_json(gemini_api_key: str | None = None) -> str:
-    """Minimal OpenClaw config: Gemini as default model. If gemini_api_key is set, include it in models.providers.google so OpenClaw finds it (agent auth)."""
+def _openclaw_gemini_config_json(
+    gemini_api_key: str | None = None,
+    telegram_bot_token: str | None = None,
+) -> str:
+    """Minimal OpenClaw config: Gemini as default model. If gemini_api_key is set, include it in models.providers.google.
+    If telegram_bot_token is set, add channels.telegram per https://docs.openclaw.ai/channels/telegram (optional step)."""
     google_provider: dict[str, Any] = {
         "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
         "models": [
@@ -50,7 +58,7 @@ def _openclaw_gemini_config_json(gemini_api_key: str | None = None) -> str:
     }
     if gemini_api_key and gemini_api_key.strip():
         google_provider["apiKey"] = gemini_api_key.strip()
-    config = {
+    config: dict[str, Any] = {
         "gateway": {
             "port": 18789,
             "mode": "local",
@@ -77,18 +85,113 @@ def _openclaw_gemini_config_json(gemini_api_key: str | None = None) -> str:
             }
         },
     }
+    if telegram_bot_token and telegram_bot_token.strip():
+        config["channels"] = {
+            "telegram": {
+                "enabled": True,
+                "botToken": telegram_bot_token.strip(),
+                "dmPolicy": "pairing",
+                "groups": {"*": {"requireMention": True}},
+            }
+        }
     return json.dumps(config, separators=(",", ":"))
+
+
+def _telegram_config_fragment(bot_token: str) -> dict[str, Any]:
+    """OpenClaw channels.telegram fragment for merging into existing config."""
+    token = (bot_token or "").strip()
+    if not token:
+        return {}
+    return {
+        "channels": {
+            "telegram": {
+                "enabled": True,
+                "botToken": token,
+                "dmPolicy": "pairing",
+                "groups": {"*": {"requireMention": True}},
+            }
+        }
+    }
+
+
+def _apply_telegram_config_via_ssh_sync(
+    host: str,
+    root_password: str,
+    telegram_fragment: dict[str, Any],
+) -> None:
+    """
+    Sync SSH: read /root/openclaw.json on the VPS, merge telegram fragment, write back, restart openclaw container.
+    Raises on SSH or command failure.
+    """
+    import paramiko
+
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    try:
+        client.connect(
+            host,
+            username="root",
+            password=root_password,
+            timeout=SSH_CONNECT_TIMEOUT,
+            banner_timeout=SSH_CONNECT_TIMEOUT,
+        )
+    except Exception as e:
+        logger.warning("apply_telegram SSH connect failed host=%s: %s", host, e)
+        raise
+
+    try:
+        # Read current config
+        stdin, stdout, stderr = client.exec_command(
+            "cat /root/openclaw.json",
+            timeout=SSH_COMMAND_TIMEOUT,
+        )
+        err = stderr.read().decode().strip()
+        if err:
+            logger.warning("apply_telegram cat stderr host=%s: %s", host, err)
+        out = stdout.read().decode()
+        try:
+            config = json.loads(out)
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"Invalid openclaw.json on instance: {e}") from e
+
+        # Deep merge: ensure "channels" exists and set "channels"."telegram"
+        if "channels" not in config or not isinstance(config["channels"], dict):
+            config["channels"] = {}
+        config["channels"]["telegram"] = telegram_fragment["channels"]["telegram"]
+
+        new_json = json.dumps(config, separators=(",", ":"))
+        b64 = base64.b64encode(new_json.encode()).decode()
+        cmd = f"echo '{b64}' | base64 -d > /root/openclaw.json"
+        stdin, stdout, stderr = client.exec_command(cmd, timeout=SSH_COMMAND_TIMEOUT)
+        exit_status = stdout.channel.recv_exit_status()
+        if exit_status != 0:
+            err = (stderr.read().decode() or "").strip()
+            raise RuntimeError(f"Failed to write openclaw.json: exit {exit_status} {err}")
+
+        # Restart OpenClaw container
+        stdin, stdout, stderr = client.exec_command(
+            "docker restart openclaw",
+            timeout=SSH_COMMAND_TIMEOUT,
+        )
+        exit_status = stdout.channel.recv_exit_status()
+        if exit_status != 0:
+            err = (stderr.read().decode() or "").strip()
+            logger.warning("apply_telegram docker restart failed host=%s: %s", host, err)
+            raise RuntimeError(f"docker restart openclaw failed: exit {exit_status} {err}")
+    finally:
+        client.close()
 
 
 def _cloud_init_user_data(
     domain: str,
     gateway_token: str,
     gemini_api_key: str | None = None,
+    telegram_bot_token: str | None = None,
 ) -> str:
-    """Cloud-Init YAML: Docker, OpenClaw with Gemini config, Nginx, Certbot. No Ollama."""
+    """Cloud-Init YAML: Docker, OpenClaw with Gemini config, optional Telegram channel, Nginx, Certbot. No Ollama."""
     image = settings.openclaw_docker_image
     port = settings.openclaw_app_port
-    openclaw_json = _openclaw_gemini_config_json(gemini_api_key)
+    openclaw_json = _openclaw_gemini_config_json(gemini_api_key, telegram_bot_token)
 
     # Store gateway token in a file (base64) so runcmd never embeds it; avoids shell quoting issues.
     gateway_token_b64 = base64.b64encode(gateway_token.encode()).decode()
@@ -240,13 +343,16 @@ async def provision_instance(
                 await session.commit()
         return
 
-    cloud_init = _cloud_init_user_data(domain, gateway_token, gemini_api_key)
+    telegram_bot_token = (user.telegram_bot_token or "").strip() or None
+    cloud_init = _cloud_init_user_data(domain, gateway_token, gemini_api_key, telegram_bot_token)
+    root_password = secrets.token_urlsafe(24)
     try:
         logger.info("provision_instance: calling Contabo create_vps instance_id=%s", instance_id)
         create_result = await provider.create_vps(
             region="default",
             plan_type=plan_type,
             cloud_init_user_data=cloud_init,
+            root_password=root_password,
         )
     except (NotImplementedError, RuntimeError, Exception) as e:
         logger.exception("provision_instance: Contabo create_vps failed instance_id=%s: %s", instance_id, e)
@@ -314,6 +420,57 @@ async def provision_instance(
     login_url = f"https://{domain}"
     await send_provisioning_done(user.email, login_url, domain, ip_address)
     logger.info("provision_instance: done instance_id=%s domain=%s", instance_id, domain)
+
+
+async def apply_telegram_to_instance(
+    ctx: dict[str, Any],
+    instance_id_str: str,
+    user_id_str: str,
+) -> None:
+    """
+    ARQ job: SSH to a running instance, merge channels.telegram into /root/openclaw.json, restart openclaw.
+    Called when user saves a Telegram token and has existing running instances.
+    """
+    instance_id = uuid.UUID(instance_id_str)
+    user_id = uuid.UUID(user_id_str)
+    logger.info("apply_telegram_to_instance started instance_id=%s user_id=%s", instance_id, user_id)
+
+    async with async_session_maker() as session:
+        r = await session.execute(select(Instance).where(Instance.id == instance_id))
+        instance = r.scalar_one_or_none()
+        if not instance:
+            logger.warning("apply_telegram_to_instance: instance not found instance_id=%s", instance_id)
+            return
+        if instance.user_id != user_id:
+            logger.warning("apply_telegram_to_instance: instance does not belong to user instance_id=%s", instance_id)
+            return
+        if instance.status != InstanceStatus.running:
+            logger.info("apply_telegram_to_instance: instance not running instance_id=%s status=%s", instance_id, instance.status)
+            return
+        if not (instance.ip_address and instance.root_password):
+            logger.warning("apply_telegram_to_instance: missing ip_address or root_password instance_id=%s", instance_id)
+            return
+
+        u = await session.execute(select(User).where(User.id == user_id))
+        user = u.scalar_one_or_none()
+        if not user or not (user.telegram_bot_token and user.telegram_bot_token.strip()):
+            logger.warning("apply_telegram_to_instance: user or telegram token missing user_id=%s", user_id)
+            return
+
+        fragment = _telegram_config_fragment(user.telegram_bot_token)
+        if not fragment:
+            return
+
+    try:
+        await asyncio.to_thread(
+            _apply_telegram_config_via_ssh_sync,
+            instance.ip_address,
+            instance.root_password,
+            fragment,
+        )
+        logger.info("apply_telegram_to_instance: done instance_id=%s", instance_id)
+    except Exception as e:
+        logger.exception("apply_telegram_to_instance failed instance_id=%s: %s", instance_id, e)
 
 
 def _gcp_project_id() -> str | None:

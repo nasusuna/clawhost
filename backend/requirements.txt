@@ -28,6 +28,9 @@ httpx==0.28.1
 # 42.x has pre-built wheels on Windows; 44+ may require Rust to build
 cryptography>=41.0.0,<43
 
+# SSH to apply Telegram config on existing instances
+paramiko>=3.4.0,<4
+
 # Optional: email (Resend or SendGrid)
 resend==2.5.1
 

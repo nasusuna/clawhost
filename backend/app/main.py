@@ -33,6 +33,7 @@ from app.db.session import engine
 from app.instances.routes import router as instances_router
 from app.subscription.routes import router as subscription_router
 from app.usage.routes import router as usage_router
+from app.user.routes import router as user_router
 from app.webhooks.routes import router as webhooks_router
 
 _ensure_gcp_credentials_file()
@@ -85,6 +86,7 @@ if not settings.cors_allowed_origins:
 app.add_middleware(CORSMiddleware, **_cors_kw)
 
 app.include_router(auth_router)
+app.include_router(user_router)
 app.include_router(admin_router)
 app.include_router(subscription_router)
 app.include_router(instances_router)

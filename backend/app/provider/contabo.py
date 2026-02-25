@@ -1,4 +1,5 @@
-"""Contabo API client — create VPS, get status, stop, cancel."""
+"""Contabo API client — create VPS, get status, stop, cancel. Uses Secrets API for root password."""
+import logging
 import uuid
 from typing import Any
 
@@ -6,6 +7,8 @@ import httpx
 
 from app.provider.base import CreateVpsResult, InstanceDetails, ProviderClient
 from app.provider.contabo_auth import get_contabo_token
+
+logger = logging.getLogger(__name__)
 
 # Ubuntu 22.04 (Contabo default image)
 DEFAULT_IMAGE_ID = "afecbb85-e2fc-46f0-9684-b46b1faf00bb"
@@ -51,6 +54,34 @@ class ContaboClient(ProviderClient):
     async def _token(self) -> str | None:
         return await get_contabo_token()
 
+    async def _create_password_secret(self, token: str, password: str) -> int:
+        """
+        Create a password secret via Contabo Secrets API. Returns the secretId (integer).
+        Used so we can pass rootPassword as secretId when creating the instance.
+        """
+        # Contabo Secrets API: POST /v1/secrets with type and value (or password). Response data[].secretId or id.
+        body: dict[str, Any] = {"type": "password", "value": password}
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                f"{self.api_url}/v1/secrets",
+                json=body,
+                headers=self._headers(token),
+            )
+        if resp.status_code not in (200, 201):
+            logger.warning("Contabo create secret failed: %s %s", resp.status_code, resp.text[:300])
+            raise RuntimeError(
+                f"Contabo create secret failed: {resp.status_code} {resp.text[:200] if resp.text else ''}"
+            )
+        data = resp.json()
+        items = data.get("data") or []
+        if not items:
+            raise RuntimeError("Contabo create secret: no data in response")
+        first = items[0] if isinstance(items[0], dict) else {}
+        secret_id = first.get("secretId") or first.get("id")
+        if secret_id is None:
+            raise RuntimeError("Contabo create secret: no secretId in response")
+        return int(secret_id)
+
     async def create_vps(
         self,
         region: str,
@@ -72,8 +103,8 @@ class ContaboClient(ProviderClient):
             "period": 1,
         }
         if root_password:
-            # Optional: use Secrets API to create password secret and set body["rootPassword"] = secret_id
-            pass
+            secret_id = await self._create_password_secret(token, root_password)
+            body["rootPassword"] = secret_id
         async with httpx.AsyncClient(timeout=60.0) as client:
             url = f"{self.api_url}/v1/compute/instances"
             resp = await client.post(

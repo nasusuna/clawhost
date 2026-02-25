@@ -34,6 +34,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     stripe_customer_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    telegram_bot_token: Mapped[str | None] = mapped_column(String(256), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     subscriptions: Mapped[list["Subscription"]] = relationship(
