@@ -9,6 +9,8 @@ import { api } from "@/lib/api";
 
 type TelegramStatus = { has_token: boolean };
 type SnippetResponse = { config_fragment: Record<string, unknown> } | null;
+type FullConfigInstance = { instance_id: string; domain: string | null; full_config: Record<string, unknown> };
+type FullConfigResponse = { instances: FullConfigInstance[] } | null;
 type Instance = { id: string; status: string };
 
 export default function TelegramSetupPage() {
@@ -18,8 +20,9 @@ export default function TelegramSetupPage() {
   const [success, setSuccess] = useState(false);
   const [hasToken, setHasToken] = useState<boolean | null>(null);
   const [snippet, setSnippet] = useState<SnippetResponse | null>(null);
+  const [fullConfig, setFullConfig] = useState<FullConfigResponse | null>(null);
   const [instances, setInstances] = useState<Instance[]>([]);
-  const [copied, setCopied] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const fetchStatus = useCallback(() => {
     api<TelegramStatus>("/user/telegram-token")
@@ -37,8 +40,12 @@ export default function TelegramSetupPage() {
       api<SnippetResponse>("/user/telegram-config-snippet")
         .then((s) => setSnippet(s))
         .catch(() => setSnippet(null));
+      api<FullConfigResponse>("/user/telegram-full-config")
+        .then((r) => setFullConfig(r ?? null))
+        .catch(() => setFullConfig(null));
     } else {
       setSnippet(null);
+      setFullConfig(null);
     }
   }, [hasToken]);
 
@@ -56,8 +63,12 @@ export default function TelegramSetupPage() {
       setSuccess(true);
       setHasToken(true);
       setToken("");
-      const sn = await api<SnippetResponse>("/user/telegram-config-snippet").catch(() => null);
+      const [sn, fc] = await Promise.all([
+        api<SnippetResponse>("/user/telegram-config-snippet").catch(() => null),
+        api<FullConfigResponse>("/user/telegram-full-config").catch(() => null),
+      ]);
       setSnippet(sn ?? null);
+      setFullConfig(fc ?? null);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to save token");
     } finally {
@@ -65,15 +76,14 @@ export default function TelegramSetupPage() {
     }
   };
 
-  const handleCopySnippet = () => {
-    if (!snippet?.config_fragment) return;
-    const text = JSON.stringify(snippet.config_fragment, null, 2);
+  const handleCopyFullConfig = (inst: FullConfigInstance) => {
+    const text = JSON.stringify(inst.full_config, null, 2);
     navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopiedId(inst.instance_id);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const showSnippet = (hasToken ?? false) && snippet?.config_fragment;
+  const showFullConfig = (hasToken ?? false) && fullConfig?.instances?.length;
   const existingInstances = instances.filter((i) => i.status === "running");
 
   return (
@@ -106,7 +116,7 @@ export default function TelegramSetupPage() {
               <ul className="list-disc list-inside space-y-1 text-muted-foreground">
                 <li><strong className="text-foreground">Optional.</strong> You can skip this and use OpenClaw without Telegram.</li>
                 <li><strong className="text-foreground">Save & Connect:</strong> we add Telegram to OpenClaw for you—for new instances (at provisioning) and for existing running instances (we update the config and restart the gateway automatically). You only need to open OpenClaw, then in Telegram DM your bot and approve the pairing code when prompted.</li>
-                <li>If an existing instance did not update automatically, use the config snippet below as a fallback.</li>
+                <li>If an existing instance did not update automatically, copy the <strong className="text-foreground">full config</strong> below for your instance and replace the entire OpenClaw config with it, then restart the gateway.</li>
               </ul>
             </div>
 
@@ -195,13 +205,13 @@ export default function TelegramSetupPage() {
                 {saving ? "Saving…" : "Save & Connect ✓"}
               </Button>
 
-              {showSnippet && existingInstances.length > 0 && (
-                <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-4">
+              {showFullConfig && (
+                <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
                   <p className="text-sm font-medium text-foreground">
-                    Fallback: add Telegram to OpenClaw manually
+                    Full config: copy and replace entire OpenClaw config
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    If an instance was not updated automatically, merge the snippet below into your OpenClaw config (Control UI or openclaw.json on the server), then restart the gateway. See{" "}
+                    If an instance was not updated automatically, copy the full config for your instance below. In OpenClaw (Control UI or <code className="rounded bg-muted px-1">openclaw.json</code> on the server), replace the entire config with this JSON, then restart the gateway. See{" "}
                     <a
                       href="https://docs.openclaw.ai/channels/telegram"
                       target="_blank"
@@ -212,19 +222,27 @@ export default function TelegramSetupPage() {
                     </a>
                     .
                   </p>
-                  <pre className="max-h-40 overflow-auto rounded bg-background p-3 text-xs font-mono text-foreground">
-                    {JSON.stringify(snippet.config_fragment, null, 2)}
-                  </pre>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    className="gap-2"
-                    onClick={handleCopySnippet}
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                    {copied ? "Copied" : "Copy snippet"}
-                  </Button>
+                  {(fullConfig?.instances ?? []).map((inst) => (
+                    <div key={inst.instance_id} className="space-y-2 rounded-lg border border-border bg-background p-3">
+                      <p className="text-xs font-medium text-foreground">
+                        Instance {inst.domain ? `(${inst.domain})` : ""}
+                      </p>
+                      <pre className="max-h-48 overflow-auto rounded bg-muted/50 p-3 text-xs font-mono text-foreground">
+                        {JSON.stringify(inst.full_config, null, 2)}
+                      </pre>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => handleCopyFullConfig(inst)}
+                        aria-label={`Copy full config for ${inst.domain ?? inst.instance_id}`}
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                        {copiedId === inst.instance_id ? "Copied" : "Copy full config"}
+                      </Button>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>

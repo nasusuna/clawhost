@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth.deps import get_current_user
 from app.db.models import Instance, InstanceStatus, User
 from app.db.session import get_session
+from app.queue.tasks import openclaw_config_dict
 from app.queue.worker import enqueue_apply_telegram_to_instance
 
 router = APIRouter(prefix="/user", tags=["user"])
@@ -28,6 +29,20 @@ class TelegramConfigSnippet(BaseModel):
     """JSON fragment to add to OpenClaw config for existing instances."""
 
     config_fragment: dict
+
+
+class TelegramFullConfigInstance(BaseModel):
+    """Full OpenClaw config for one instance (copy-paste entire config)."""
+
+    instance_id: str
+    domain: str | None
+    full_config: dict
+
+
+class TelegramFullConfigResponse(BaseModel):
+    """Per-instance full configs when user has a token and running instances."""
+
+    instances: list[TelegramFullConfigInstance]
 
 
 async def _validate_telegram_token(token: str) -> bool:
@@ -123,3 +138,42 @@ async def get_telegram_config_snippet(
             }
         }
     )
+
+
+@router.get("/telegram-full-config", response_model=TelegramFullConfigResponse | None)
+async def get_telegram_full_config(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> TelegramFullConfigResponse | None:
+    """
+    Return full OpenClaw config (per running instance) with Telegram included.
+    User can copy-paste the entire JSON into OpenClaw config (replace whole file).
+    Returns None if user has no token set.
+    """
+    token = (user.telegram_bot_token or "").strip()
+    if not token:
+        return None
+    result = await session.execute(
+        select(Instance).where(
+            and_(
+                Instance.user_id == user.id,
+                Instance.status == InstanceStatus.running,
+            )
+        )
+    )
+    instances = result.scalars().all()
+    out = []
+    for inst in instances:
+        full_config = openclaw_config_dict(
+            gateway_token=inst.gateway_token,
+            gemini_api_key=inst.gemini_api_key,
+            telegram_bot_token=token,
+        )
+        out.append(
+            TelegramFullConfigInstance(
+                instance_id=str(inst.id),
+                domain=inst.domain,
+                full_config=full_config,
+            )
+        )
+    return TelegramFullConfigResponse(instances=out) if out else TelegramFullConfigResponse(instances=[])

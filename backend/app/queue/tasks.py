@@ -39,12 +39,15 @@ async def _get_provider_client() -> ContaboClient | None:
     return ContaboClient(settings.contabo_api_url)
 
 
-def _openclaw_gemini_config_json(
+def openclaw_config_dict(
+    gateway_token: str | None = None,
     gemini_api_key: str | None = None,
     telegram_bot_token: str | None = None,
-) -> str:
-    """Minimal OpenClaw config: Gemini as default model. If gemini_api_key is set, include it in models.providers.google.
-    If telegram_bot_token is set, add channels.telegram per https://docs.openclaw.ai/channels/telegram (optional step)."""
+) -> dict[str, Any]:
+    """
+    Full OpenClaw config as dict. Used for cloud-init (gateway_token via env) and for
+    user-facing "full config" copy-paste (real gateway_token so paste works).
+    """
     google_provider: dict[str, Any] = {
         "baseUrl": "https://generativelanguage.googleapis.com/v1beta",
         "models": [
@@ -58,6 +61,7 @@ def _openclaw_gemini_config_json(
     }
     if gemini_api_key and gemini_api_key.strip():
         google_provider["apiKey"] = gemini_api_key.strip()
+    auth_token = (gateway_token or "").strip() or "__OPENCLAW_REDACTED__"
     config: dict[str, Any] = {
         "gateway": {
             "port": 18789,
@@ -67,7 +71,7 @@ def _openclaw_gemini_config_json(
                 "dangerouslyDisableDeviceAuth": True,
                 "dangerouslyAllowHostHeaderOriginFallback": True,
             },
-            "auth": {"mode": "token", "token": "__OPENCLAW_REDACTED__"},
+            "auth": {"mode": "token", "token": auth_token},
             "trustedProxies": ["127.0.0.1", "::1"],
             "tls": {"enabled": False},
         },
@@ -94,6 +98,16 @@ def _openclaw_gemini_config_json(
                 "groups": {"*": {"requireMention": True}},
             }
         }
+    return config
+
+
+def _openclaw_gemini_config_json(
+    gemini_api_key: str | None = None,
+    telegram_bot_token: str | None = None,
+) -> str:
+    """Minimal OpenClaw config: Gemini as default model. If gemini_api_key is set, include it in models.providers.google.
+    If telegram_bot_token is set, add channels.telegram per https://docs.openclaw.ai/channels/telegram (optional step)."""
+    config = openclaw_config_dict(None, gemini_api_key, telegram_bot_token)
     return json.dumps(config, separators=(",", ":"))
 
 
