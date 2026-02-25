@@ -1,9 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { Check } from "lucide-react";
+import { Check, Info } from "lucide-react";
 
-const plans = [
+const GEMINI_FLASH_LITE_TOOLTIP =
+  "Our most cost-efficient multimodal model, offering the fastest performance for high-frequency, lightweight tasks. Gemini 2.5 Flash-Lite is best for high-volume classification, simple data extraction, and extremely low-latency applications where budget and speed are the primary constraints.";
+
+type PlanFeature = string | { text: string; tooltip: string };
+
+const plans: Array<{
+  name: string;
+  price: number;
+  desc: string;
+  features: PlanFeature[];
+  cta: string;
+  highlight: boolean;
+}> = [
   {
     name: "Starter",
     price: 39.99,
@@ -11,6 +23,11 @@ const plans = [
     features: [
       "1 AI agent",
       "1 messaging channel",
+      "Telegram Bot ready",
+      {
+        text: "Pre configured 'Gemini 2.5 Flash-Lite'",
+        tooltip: GEMINI_FLASH_LITE_TOOLTIP,
+      },
       "99.9% uptime SLA",
       "Auto-updates",
       "Email support",
@@ -67,12 +84,28 @@ export default function PricingSection() {
               </div>
 
               <ul className="mb-6 space-y-2.5">
-                {plan.features.map((feat, j) => (
-                  <li key={j} className="flex items-center gap-2.5 text-sm text-muted-foreground">
-                    <Check className="h-4 w-4 shrink-0 text-brand-cyan" />
-                    {feat}
-                  </li>
-                ))}
+                {plan.features.map((feat, j) => {
+                  const isWithTooltip = typeof feat === "object" && "text" in feat && "tooltip" in feat;
+                  return (
+                    <li key={j} className="flex items-center gap-2.5 text-sm text-muted-foreground">
+                      <Check className="h-4 w-4 shrink-0 text-brand-cyan" />
+                      {isWithTooltip ? (
+                        <>
+                          <span>{(feat as { text: string; tooltip: string }).text}</span>
+                          <span
+                            className="inline-flex shrink-0 cursor-help text-muted-foreground/80 hover:text-foreground"
+                            title={(feat as { text: string; tooltip: string }).tooltip}
+                            aria-label="More information"
+                          >
+                            <Info className="h-3.5 w-3.5" />
+                          </span>
+                        </>
+                      ) : (
+                        feat as string
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
 
               <Link
