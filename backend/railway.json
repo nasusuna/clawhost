@@ -4,7 +4,7 @@
     "builder": "DOCKERFILE"
   },
   "deploy": {
-    "startCommand": "sh -c 'if [ -n \"$CLAWHOST_RUN_WORKER\" ]; then exec arq app.queue.worker.WorkerSettings; else exec uvicorn app.main:app --host 0.0.0.0 --port $PORT; fi'",
+    "startCommand": "sh -c 'if [ -n \"$CLAWHOST_RUN_WORKER\" ]; then exec arq app.queue.worker.WorkerSettings; else alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port $PORT; fi'",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 3
   }
