@@ -88,6 +88,7 @@ class Instance(Base):
     domain: Mapped[str | None] = mapped_column(String(255), nullable=True)
     gateway_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
     gemini_api_key: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    openrouter_api_key: Mapped[str | None] = mapped_column(String(256), nullable=True)
     provision_job_id: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
     last_heartbeat: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

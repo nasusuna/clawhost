@@ -80,28 +80,26 @@ async def handle_checkout_session_completed(session: AsyncSession, event: dict) 
     session.add(instance)
     await session.flush()
 
-    project_id: str | None = None
-    if _use_per_subscription_gcp_project():
-        # Create new GCP project for this subscription: project, enable API, link billing, create $15 budget
-        from app.gcp_project.lifecycle import create_project_and_setup
+    # Gemini/GCP per-subscription project + key is currently disabled; instances rely on OpenRouter.
+    # Leave the code here for future re-enable, but skip calling GCP and create_one_key_for_subscription.
 
-        project_id = await asyncio.to_thread(
-            create_project_and_setup,
-            settings.gcp_organization_id.strip(),
-            settings.gcp_billing_account_id.strip(),
-            subscription.id,
-            amount_usd=getattr(settings, "gcp_budget_amount_usd", 15.0),
+    # OpenRouter: create one API key per instance (optional; requires OPENROUTER_MANAGEMENT_API_KEY)
+    mgmt_key = (getattr(settings, "openrouter_management_api_key", "") or "").strip()
+    if mgmt_key:
+        from app.openrouter.client import create_key as openrouter_create_key
+
+        key_name = f"ClawBolt instance {instance.id}"
+        limit_usd = getattr(settings, "openrouter_key_limit_usd", 0) or None
+        limit_reset = getattr(settings, "openrouter_key_limit_reset", "monthly") or "monthly"
+        or_key = await asyncio.to_thread(
+            openrouter_create_key,
+            mgmt_key,
+            key_name,
+            limit_usd=limit_usd if (limit_usd and limit_usd > 0) else None,
+            limit_reset=limit_reset,
         )
-        if project_id:
-            subscription.gcp_project_id = project_id
-            session.add(subscription)
-    if not project_id:
-        project_id = _gcp_project_id()
-
-    if project_id:
-        key_string = await create_one_key_for_subscription(project_id, subscription.id)
-        if key_string:
-            instance.gemini_api_key = key_string
+        if or_key:
+            instance.openrouter_api_key = or_key
             session.add(instance)
 
     await session.commit()

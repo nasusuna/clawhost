@@ -168,6 +168,7 @@ async def get_telegram_full_config(
             gateway_token=inst.gateway_token,
             gemini_api_key=inst.gemini_api_key,
             telegram_bot_token=token,
+            openrouter_api_key=inst.openrouter_api_key,
         )
         out.append(
             TelegramFullConfigInstance(

@@ -43,6 +43,7 @@ def openclaw_config_dict(
     gateway_token: str | None = None,
     gemini_api_key: str | None = None,
     telegram_bot_token: str | None = None,
+    openrouter_api_key: str | None = None,
 ) -> dict[str, Any]:
     """
     Full OpenClaw config as dict. Used for cloud-init (gateway_token via env) and for
@@ -62,6 +63,10 @@ def openclaw_config_dict(
     if gemini_api_key and gemini_api_key.strip():
         google_provider["apiKey"] = gemini_api_key.strip()
     auth_token = (gateway_token or "").strip() or "__OPENCLAW_REDACTED__"
+    # Default primary model: prefer OpenRouter (ChatGPT) when key is present, else Gemini
+    primary_model = "google/gemini-2.5-flash-lite"
+    if openrouter_api_key and openrouter_api_key.strip():
+        primary_model = "openrouter/openai/gpt-4.1"
     config: dict[str, Any] = {
         "gateway": {
             "port": 18789,
@@ -77,10 +82,17 @@ def openclaw_config_dict(
         },
         "agents": {
             "defaults": {
-                "model": {"primary": "google/gemini-2.5-flash-lite"},
+                # Primary default model for new instances
+                "model": {"primary": primary_model},
                 "workspace": "/home/node/.openclaw/workspace",
                 "timeoutSeconds": 1200,
                 "maxConcurrent": 4,
+                # Curated model list for the dropdown in the UI
+                "models": {
+                    "google/gemini-2.5-flash-lite": {
+                        "alias": "Gemini 2.5 Flash Lite",
+                    },
+                },
             }
         },
         "models": {
@@ -98,16 +110,32 @@ def openclaw_config_dict(
                 "groups": {"*": {"requireMention": True}},
             }
         }
+    if openrouter_api_key and openrouter_api_key.strip():
+        # Pass OpenRouter key via env so built-in OpenRouter provider works
+        config["env"] = config.get("env") or {}
+        config["env"]["OPENROUTER_API_KEY"] = openrouter_api_key.strip()
+        # Extend curated model list with a small OpenRouter set
+        defaults = config.setdefault("agents", {}).setdefault("defaults", {})
+        models_map = defaults.setdefault("models", {})
+        models_map.setdefault(
+            "openrouter/anthropic/claude-sonnet-4-5",
+            {"alias": "Claude Sonnet 4.5 (OpenRouter)"},
+        )
+        models_map.setdefault(
+            "openrouter/openai/gpt-4.1",
+            {"alias": "ChatGPT (GPT‑4.1 via OpenRouter)"},
+        )
     return config
 
 
 def _openclaw_gemini_config_json(
     gemini_api_key: str | None = None,
     telegram_bot_token: str | None = None,
+    openrouter_api_key: str | None = None,
 ) -> str:
     """Minimal OpenClaw config: Gemini as default model. If gemini_api_key is set, include it in models.providers.google.
-    If telegram_bot_token is set, add channels.telegram per https://docs.openclaw.ai/channels/telegram (optional step)."""
-    config = openclaw_config_dict(None, gemini_api_key, telegram_bot_token)
+    If telegram_bot_token is set, add channels.telegram. If openrouter_api_key is set, add env OPENROUTER_API_KEY."""
+    config = openclaw_config_dict(None, gemini_api_key, telegram_bot_token, openrouter_api_key)
     return json.dumps(config, separators=(",", ":"))
 
 
@@ -205,11 +233,12 @@ def _cloud_init_user_data(
     gateway_token: str,
     gemini_api_key: str | None = None,
     telegram_bot_token: str | None = None,
+    openrouter_api_key: str | None = None,
 ) -> str:
-    """Cloud-Init YAML: Docker, OpenClaw with Gemini config, optional Telegram channel, Nginx, Certbot. No Ollama."""
+    """Cloud-Init YAML: Docker, OpenClaw with Gemini config, optional Telegram + OpenRouter, Nginx, Certbot. No Ollama."""
     image = settings.openclaw_docker_image
     port = settings.openclaw_app_port
-    openclaw_json = _openclaw_gemini_config_json(gemini_api_key, telegram_bot_token)
+    openclaw_json = _openclaw_gemini_config_json(gemini_api_key, telegram_bot_token, openrouter_api_key)
 
     # Store gateway token in a file (base64) so runcmd never embeds it; avoids shell quoting issues.
     gateway_token_b64 = base64.b64encode(gateway_token.encode()).decode()
@@ -362,7 +391,10 @@ async def provision_instance(
         return
 
     telegram_bot_token = (user.telegram_bot_token or "").strip() or None
-    cloud_init = _cloud_init_user_data(domain, gateway_token, gemini_api_key, telegram_bot_token)
+    openrouter_api_key = (instance.openrouter_api_key or "").strip() or None
+    cloud_init = _cloud_init_user_data(
+        domain, gateway_token, gemini_api_key, telegram_bot_token, openrouter_api_key
+    )
     root_password = secrets.token_urlsafe(24)
     try:
         logger.info("provision_instance: calling Contabo create_vps instance_id=%s", instance_id)

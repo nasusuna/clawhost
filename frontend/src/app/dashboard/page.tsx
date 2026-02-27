@@ -11,8 +11,8 @@ type Sub = { id: string; status: string; plan_type: string; current_period_end: 
 type InstanceUsage = {
   instance_id: string;
   domain: string | null;
-  tokens_used: number;
-  tokens_cap: number;
+  used_usd: number;
+  limit_usd: number;
   period_end: string;
   over_limit: boolean;
 };
@@ -82,10 +82,9 @@ function StartOpenClawCard() {
   );
 }
 
-const formatTokens = (n: number): string => {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`;
-  return String(n);
+const formatDollars = (n: number): string => {
+  if (!Number.isFinite(n)) return "$0.00";
+  return `$${n.toFixed(2)}`;
 };
 
 export default function DashboardPage() {
@@ -127,7 +126,7 @@ export default function DashboardPage() {
         <StartOpenClawCard />
         <Card className="md:col-span-2">
           <CardHeader>
-            <CardTitle>Gemini token usage</CardTitle>
+            <CardTitle>OpenRouter usage</CardTitle>
           </CardHeader>
           <CardContent>
             {usage === undefined && <p className="text-neutral-400">Loading…</p>}
@@ -137,23 +136,31 @@ export default function DashboardPage() {
             {usage && usage.instances.length > 0 && (
               <div className="space-y-4">
                 {usage.instances.map((inst) => {
-                  const pct = Math.min(100, (inst.tokens_used / inst.tokens_cap) * 100);
+                  const limit = inst.limit_usd || 0;
+                  const used = inst.used_usd || 0;
+                  const pct = limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
                   const label = inst.domain || `Instance ${inst.instance_id.slice(0, 8)}`;
                   return (
                     <div key={inst.instance_id} className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span className="font-medium text-neutral-300">{label}</span>
                         <span className="text-neutral-400">
-                          {formatTokens(inst.tokens_used)} / {formatTokens(inst.tokens_cap)} tokens
+                          {formatDollars(used)}{" "}
+                          {limit > 0 && (
+                            <>
+                              {" / "}
+                              {formatDollars(limit)}
+                            </>
+                          )}
                         </span>
                       </div>
                       <div
                         className="h-2 w-full rounded-full bg-neutral-800 overflow-hidden"
                         role="progressbar"
-                        aria-valuenow={inst.tokens_used}
+                        aria-valuenow={used}
                         aria-valuemin={0}
-                        aria-valuemax={inst.tokens_cap}
-                        aria-label={`Token usage for ${label}`}
+                        aria-valuemax={limit || 0}
+                        aria-label={`OpenRouter usage for ${label}`}
                       >
                         <div
                           className={inst.over_limit ? "h-full bg-red-500" : "h-full bg-emerald-500"}
@@ -162,7 +169,8 @@ export default function DashboardPage() {
                       </div>
                       {inst.over_limit && (
                         <p className="text-sm text-red-400">
-                          Usage limit reached — API disabled until next period (resets {new Date(inst.period_end).toLocaleDateString()}).
+                          OpenRouter limit reached — requests may be rejected until next period (resets{" "}
+                          {new Date(inst.period_end).toLocaleDateString()}).
                         </p>
                       )}
                       {!inst.over_limit && (

@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     # Optional: Gemini API key used for new instances when user has not set one (shared key; you pay usage)
     gemini_api_key: str = ""
 
+    # OpenRouter: create one API key per instance via Management API (https://openrouter.ai/settings/management-keys)
+    openrouter_management_api_key: str = ""
+    openrouter_key_limit_usd: float = 0  # 0 = no limit; set e.g. 50 for monthly cap per user
+    openrouter_key_limit_reset: str = "monthly"  # daily | weekly | monthly
+
     # Admin: secret for key-pool and other admin endpoints (Header: X-Admin-Secret). If empty, admin routes return 403.
     admin_secret: str = ""
 
