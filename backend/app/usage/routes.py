@@ -18,6 +18,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter(prefix="/usage", tags=["usage"])
 
+# Legacy Gemini monthly token cap, still imported by admin routes for /admin/instances/{id}/usage.
+TOKENS_CAP_PER_MONTH = 60_000_000
+
 
 def _period_end_for(d: date) -> date:
     """Last day of the month."""
